@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ─────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isStudent() {
+      return isSignedIn() && getUserData().role == 'student';
+    }
+
+    function isStartup() {
+      return isSignedIn() && getUserData().role == 'startup';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'admin';
+    }
+
+    function isApprovedStartup() {
+      return isStartup() &&
+        get(/databases/$(database)/documents/startups/$(request.auth.uid)).data.verificationStatus == 'approved';
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // ── Startups ──────────────────────────────────────────────────────
+    match /startups/{startupId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(startupId);
+      allow update: if isOwner(startupId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Opportunities ─────────────────────────────────────────────────
+    match /opportunities/{opportunityId} {
+      allow read: if isSignedIn();
+      // Only approved startups can create
+      allow create: if isApprovedStartup() &&
+        request.resource.data.startupId == request.auth.uid;
+      // Only the owning startup can update/close
+      allow update: if isSignedIn() && (
+        resource.data.startupId == request.auth.uid ||
+        // Allow applicationCount increment from any signed-in user (for apply)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicationCount']))
+      );
+      allow delete: if resource.data.startupId == request.auth.uid || isAdmin();
+    }
+
+    // ── Applications ──────────────────────────────────────────────────
+    match /applications/{applicationId} {
+      // Students can read their own; startups can read theirs
+      allow read: if isSignedIn() && (
+        resource.data.applicantId == request.auth.uid ||
+        resource.data.startupId == request.auth.uid ||
+        isAdmin()
+      );
+      // Students can create (apply)
+      allow create: if isStudent() &&
+        request.resource.data.applicantId == request.auth.uid;
+      // Startup can update status; student can delete (withdraw)
+      allow update: if resource.data.startupId == request.auth.uid;
+      allow delete: if resource.data.applicantId == request.auth.uid;
+    }
+
+    // ── Bookmarks ─────────────────────────────────────────────────────
+    match /bookmarks/{bookmarkId} {
+      allow read, write: if isSignedIn() &&
+        resource == null || resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if resource.data.userId == request.auth.uid;
+      allow delete: if resource.data.userId == request.auth.uid;
+    }
+  }
+}
