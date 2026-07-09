@@ -76,10 +76,6 @@ class AuthRepository {
     required String email,
     required String password,
     required String fullName,
-    required String startupName,
-    required String tagline,
-    required String description,
-    required String category,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: _normalizedEmail(email),
@@ -102,13 +98,16 @@ class AuthRepository {
         .doc(credential.user!.uid)
         .set(user.toFirestore());
 
+    // Startup profile fields (name, tagline, category, description) are no
+    // longer collected at signup. Fill sensible placeholders here; the
+    // startup can fill in real details later from their profile screen.
     final startup = StartupModel(
       id: credential.user!.uid,
       ownerId: credential.user!.uid,
-      name: startupName,
-      tagline: tagline,
-      description: description,
-      category: category,
+      name: "$fullName's Startup",
+      tagline: '',
+      description: '',
+      category: 'Engineering',
       verificationStatus: 'approved',
       email: email,
       createdAt: DateTime.now(),

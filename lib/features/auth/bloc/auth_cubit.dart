@@ -96,10 +96,6 @@ class AuthCubit extends Cubit<AuthState> {
     required String email,
     required String password,
     required String fullName,
-    required String startupName,
-    required String tagline,
-    required String description,
-    required String category,
   }) async {
     emit(AuthLoading());
     try {
@@ -107,10 +103,6 @@ class AuthCubit extends Cubit<AuthState> {
         email: email,
         password: password,
         fullName: fullName,
-        startupName: startupName,
-        tagline: tagline,
-        description: description,
-        category: category,
       );
       emit(AuthAuthenticated(user));
     } on Exception catch (e) {

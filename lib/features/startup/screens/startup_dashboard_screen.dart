@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/bloc/auth_cubit.dart';
 import '../../applications/bloc/application_cubit.dart';
@@ -321,6 +322,42 @@ class _ApplicantCard extends StatelessWidget {
               _StatusBadge(status: application.status),
             ],
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.email_outlined, size: 15, color: AppColors.textTertiary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  application.applicantEmail,
+                  style: AppTextStyles.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (application.relevantSkills.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: application.relevantSkills
+                  .map((s) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          s,
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: AppColors.primary, fontSize: 11),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
           if (application.coverLetter.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(height: 1),
@@ -330,6 +367,31 @@ class _ApplicantCard extends StatelessWidget {
                   ? '${application.coverLetter.substring(0, 120)}...'
                   : application.coverLetter,
               style: AppTextStyles.bodyMedium,
+            ),
+          ],
+          if (application.portfolioUrl != null &&
+                  application.portfolioUrl!.isNotEmpty ||
+              application.resumeUrl != null &&
+                  application.resumeUrl!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 16,
+              children: [
+                if (application.portfolioUrl != null &&
+                    application.portfolioUrl!.isNotEmpty)
+                  _LinkChip(
+                    icon: Icons.link_rounded,
+                    label: 'Portfolio',
+                    url: application.portfolioUrl!,
+                  ),
+                if (application.resumeUrl != null &&
+                    application.resumeUrl!.isNotEmpty)
+                  _LinkChip(
+                    icon: Icons.description_outlined,
+                    label: 'Resume',
+                    url: application.resumeUrl!,
+                  ),
+              ],
             ),
           ],
           const SizedBox(height: 12),
@@ -361,21 +423,87 @@ class _ApplicantCard extends StatelessWidget {
                     child: const Text('Review'),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => onUpdateStatus('rejected'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 38),
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                    ),
+                    child: const Text('Reject'),
+                  ),
+                ),
               ],
             ),
           if (application.status == 'shortlisted')
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => onUpdateStatus('accepted'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  minimumSize: const Size(0, 38),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => onUpdateStatus('accepted'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      minimumSize: const Size(0, 38),
+                    ),
+                    child: const Text('Accept',
+                        style: TextStyle(color: Colors.white)),
+                  ),
                 ),
-                child: const Text('Accept',
-                    style: TextStyle(color: Colors.white)),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => onUpdateStatus('rejected'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 38),
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                    ),
+                    child: const Text('Reject'),
+                  ),
+                ),
+              ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LinkChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String url;
+
+  const _LinkChip({required this.icon, required this.label, required this.url});
+
+  Future<void> _open() async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: _open,
+      borderRadius: BorderRadius.circular(20),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppColors.primary),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+            ),
+          ),
         ],
       ),
     );
@@ -391,6 +519,7 @@ class _StatusBadge extends StatelessWidget {
       case 'under_review': return AppColors.warning;
       case 'shortlisted': return AppColors.success;
       case 'accepted': return AppColors.primary;
+      case 'rejected': return AppColors.error;
       default: return AppColors.textTertiary;
     }
   }

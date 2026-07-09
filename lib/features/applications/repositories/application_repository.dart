@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/application_model.dart';
 import '../../../core/constants/app_constants.dart';
 
@@ -9,50 +10,62 @@ class ApplicationRepository {
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
   // Watch student's own applications (real-time)
+  // NOTE: single equality field only (no .orderBy() chained in Firestore) --
+  // combining an equality filter with orderBy on a different field requires
+  // a manually-created composite index. We avoid that entirely by sorting
+  // client-side instead, same pattern used in OpportunityRepository.
   Stream<List<ApplicationModel>> watchStudentApplications(String studentId) {
     return (() async* {
       try {
         final stream = _firestore
             .collection(AppConstants.applicationsCollection)
             .where('applicantId', isEqualTo: studentId)
-            .orderBy('appliedAt', descending: true)
             .snapshots();
         await for (final snap in stream) {
-          yield snap.docs.map((doc) => ApplicationModel.fromFirestore(doc)).toList();
+          final apps =
+              snap.docs.map((doc) => ApplicationModel.fromFirestore(doc)).toList();
+          apps.sort((a, b) => b.appliedAt.compareTo(a.appliedAt));
+          yield apps;
         }
       } catch (e) {
-        print('[ApplicationRepository] watchStudentApplications error: $e');
+        debugPrint('[ApplicationRepository] watchStudentApplications error: $e');
         yield <ApplicationModel>[];
       }
     })();
   }
 
   // Watch startup's incoming applications (real-time)
+  // Same reasoning: single equality field (startupId) queried in Firestore;
+  // optional opportunityId/status filters and sorting are applied
+  // client-side so no composite index is ever required, regardless of
+  // which filter combination is active.
   Stream<List<ApplicationModel>> watchStartupApplications(
     String startupId, {
     String? opportunityId,
     String? status,
   }) {
-    Query query = _firestore
-        .collection(AppConstants.applicationsCollection)
-        .where('startupId', isEqualTo: startupId)
-        .orderBy('appliedAt', descending: true);
-
-    if (opportunityId != null) {
-      query = query.where('opportunityId', isEqualTo: opportunityId);
-    }
-    if (status != null) {
-      query = query.where('status', isEqualTo: status);
-    }
-
     return (() async* {
       try {
-        final stream = query.snapshots();
+        final stream = _firestore
+            .collection(AppConstants.applicationsCollection)
+            .where('startupId', isEqualTo: startupId)
+            .snapshots();
         await for (final snap in stream) {
-          yield snap.docs.map((doc) => ApplicationModel.fromFirestore(doc)).toList();
+          var apps =
+              snap.docs.map((doc) => ApplicationModel.fromFirestore(doc)).toList();
+
+          if (opportunityId != null) {
+            apps = apps.where((a) => a.opportunityId == opportunityId).toList();
+          }
+          if (status != null) {
+            apps = apps.where((a) => a.status == status).toList();
+          }
+
+          apps.sort((a, b) => b.appliedAt.compareTo(a.appliedAt));
+          yield apps;
         }
       } catch (e) {
-        print('[ApplicationRepository] watchStartupApplications error: $e');
+        debugPrint('[ApplicationRepository] watchStartupApplications error: $e');
         yield <ApplicationModel>[];
       }
     })();
@@ -71,7 +84,7 @@ class ApplicationRepository {
           .get();
       return snap.docs.isNotEmpty;
     } catch (e) {
-      print('[ApplicationRepository] hasApplied error: $e');
+      debugPrint('[ApplicationRepository] hasApplied error: $e');
       return false;
     }
   }
@@ -122,11 +135,17 @@ class ApplicationRepository {
 
     await ref.set(application.toFirestore());
 
-    // Increment application count on opportunity
-    await _firestore
-        .collection(AppConstants.opportunitiesCollection)
-        .doc(opportunityId)
-        .update({'applicationCount': FieldValue.increment(1)});
+    // Increment application count on opportunity. Best-effort: the
+    // application itself has already been created successfully above, so a
+    // failure here shouldn't surface as an error to the user.
+    try {
+      await _firestore
+          .collection(AppConstants.opportunitiesCollection)
+          .doc(opportunityId)
+          .update({'applicationCount': FieldValue.increment(1)});
+    } catch (e) {
+      debugPrint('[ApplicationRepository] submitApplication count update failed: $e');
+    }
 
     return application;
   }
@@ -158,9 +177,13 @@ class ApplicationRepository {
         .doc(applicationId)
         .delete();
 
-    await _firestore
-        .collection(AppConstants.opportunitiesCollection)
-        .doc(opportunityId)
-        .update({'applicationCount': FieldValue.increment(-1)});
+    try {
+      await _firestore
+          .collection(AppConstants.opportunitiesCollection)
+          .doc(opportunityId)
+          .update({'applicationCount': FieldValue.increment(-1)});
+    } catch (e) {
+      debugPrint('[ApplicationRepository] withdrawApplication count update failed: $e');
+    }
   }
 }
