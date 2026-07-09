@@ -51,6 +51,24 @@ GoRouter createRouter(AuthCubit authCubit) {
       }
       if (!isLoggedIn && !isOnAuthPage) return '/onboarding';
       if (isLoggedIn && isOnAuthPage) return '/home';
+
+      // Role-based guards: keep students out of startup-only screens and
+      // vice versa, even if they land on the route via a deep link.
+      if (isLoggedIn) {
+        final isStartup = authState.user.isStartup;
+        final location = state.matchedLocation;
+
+        const startupOnlyRoutes = ['/startup/dashboard', '/opportunity/create'];
+        final isStartupOnlyRoute =
+            startupOnlyRoutes.any((r) => location.startsWith(r));
+        if (isStartupOnlyRoute && !isStartup) return '/home';
+
+        const studentOnlyRoutes = ['/applications'];
+        final isStudentOnlyRoute =
+            studentOnlyRoutes.any((r) => location.startsWith(r));
+        if (isStudentOnlyRoute && isStartup) return '/home';
+      }
+
       return null;
     },
     routes: [
@@ -92,7 +110,23 @@ GoRouter createRouter(AuthCubit authCubit) {
               child: ProfileScreen(),
             ),
           ),
+          GoRoute(
+            path: '/startup/dashboard',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: StartupDashboardScreen(),
+            ),
+          ),
         ],
+      ),
+      // NOTE: static routes like '/opportunity/create' must be declared
+      // BEFORE the dynamic '/opportunity/:id' route. go_router matches
+      // routes in declaration order, and ':id' matches any segment
+      // (including the literal word "create"), so if the dynamic route
+      // came first it would swallow '/opportunity/create' and render
+      // OpportunityDetailScreen with id="create" -> "Opportunity not found."
+      GoRoute(
+        path: '/opportunity/create',
+        builder: (_, __) => const CreateOpportunityScreen(),
       ),
       GoRoute(
         path: '/opportunity/:id',
@@ -107,18 +141,10 @@ GoRouter createRouter(AuthCubit authCubit) {
         ),
       ),
       GoRoute(
-        path: '/opportunity/create',
-        builder: (_, __) => const CreateOpportunityScreen(),
-      ),
-      GoRoute(
         path: '/startup/:id',
         builder: (context, state) => StartupProfileScreen(
           startupId: state.pathParameters['id']!,
         ),
-      ),
-      GoRoute(
-        path: '/startup/dashboard',
-        builder: (_, __) => const StartupDashboardScreen(),
       ),
       GoRoute(
         path: '/profile/edit',

@@ -14,6 +14,7 @@ class HomeShell extends StatelessWidget {
     if (location.startsWith('/home')) return 0;
     if (location.startsWith('/explore')) return 1;
     if (location.startsWith('/applications')) return 2;
+    if (location.startsWith('/startup/dashboard')) return 2;
     if (location.startsWith('/profile')) return 3;
     return 0;
   }

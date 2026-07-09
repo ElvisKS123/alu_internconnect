@@ -82,6 +82,17 @@ class OpportunityCubit extends Cubit<OpportunityState> {
   String? _userId;
   List<String> _userSkills = [];
 
+  // Cached pieces of state that may arrive in any order (stream snapshot,
+  // one-time recommended fetch, bookmarks stream). We keep them here so
+  // whichever arrives first doesn't get dropped while waiting on the others.
+  List<OpportunityModel>? _cachedOpportunities;
+  List<OpportunityModel> _cachedRecommended = [];
+  List<String> _cachedBookmarks = [];
+  String? _selectedCategory;
+  String? _selectedType;
+  String? _selectedLocation;
+  String _searchQuery = '';
+
   OpportunityCubit({required OpportunityRepository repository})
       : _repository = repository,
         super(OpportunityInitial());
@@ -89,8 +100,25 @@ class OpportunityCubit extends Cubit<OpportunityState> {
   void init({required String userId, List<String> userSkills = const []}) {
     _userId = userId;
     _userSkills = userSkills;
+    emit(OpportunityLoading());
     _startListening();
     _loadRecommended();
+  }
+
+  // Builds/emits OpportunitiesLoaded from whatever cached pieces we have so
+  // far, as soon as the opportunities list itself has arrived at least once.
+  void _emitCurrent() {
+    final opportunities = _cachedOpportunities;
+    if (opportunities == null) return; // still waiting on first snapshot
+    emit(OpportunitiesLoaded(
+      opportunities: opportunities,
+      recommended: _cachedRecommended,
+      bookmarkedIds: _cachedBookmarks,
+      selectedCategory: _selectedCategory,
+      selectedType: _selectedType,
+      selectedLocation: _selectedLocation,
+      searchQuery: _searchQuery,
+    ));
   }
 
   void _startListening({
@@ -99,6 +127,12 @@ class OpportunityCubit extends Cubit<OpportunityState> {
     String? location,
     String? searchQuery,
   }) {
+    _selectedCategory = category;
+    _selectedType = type;
+    _selectedLocation = location;
+    _searchQuery = searchQuery ?? '';
+    _cachedOpportunities = null;
+
     _opportunitiesSubscription?.cancel();
     _opportunitiesSubscription = _repository
         .watchOpenOpportunities(
@@ -109,18 +143,8 @@ class OpportunityCubit extends Cubit<OpportunityState> {
         )
         .listen(
           (opportunities) {
-            final current = state is OpportunitiesLoaded
-                ? (state as OpportunitiesLoaded)
-                : null;
-            emit(OpportunitiesLoaded(
-              opportunities: opportunities,
-              recommended: current?.recommended ?? [],
-              bookmarkedIds: current?.bookmarkedIds ?? [],
-              selectedCategory: category,
-              selectedType: type,
-              selectedLocation: location,
-              searchQuery: searchQuery ?? '',
-            ));
+            _cachedOpportunities = opportunities;
+            _emitCurrent();
           },
           onError: (e) => emit(OpportunityError(e.toString())),
         );
@@ -130,9 +154,8 @@ class OpportunityCubit extends Cubit<OpportunityState> {
       _bookmarksSubscription = _repository
           .watchBookmarks(_userId!)
           .listen((bookmarks) {
-        if (state is OpportunitiesLoaded) {
-          emit((state as OpportunitiesLoaded).copyWith(bookmarkedIds: bookmarks));
-        }
+        _cachedBookmarks = bookmarks;
+        _emitCurrent();
       });
     }
   }
@@ -142,9 +165,8 @@ class OpportunityCubit extends Cubit<OpportunityState> {
       final recommended = await _repository.getRecommended(
         studentSkills: _userSkills,
       );
-      if (state is OpportunitiesLoaded) {
-        emit((state as OpportunitiesLoaded).copyWith(recommended: recommended));
-      }
+      _cachedRecommended = recommended;
+      _emitCurrent();
     } catch (_) {}
   }
 

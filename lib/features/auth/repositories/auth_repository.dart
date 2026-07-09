@@ -80,7 +80,6 @@ class AuthRepository {
     required String tagline,
     required String description,
     required String category,
-    required String aluRecognitionProof,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: _normalizedEmail(email),
@@ -111,7 +110,6 @@ class AuthRepository {
       description: description,
       category: category,
       verificationStatus: 'approved',
-      aluRecognitionProof: aluRecognitionProof,
       email: email,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),

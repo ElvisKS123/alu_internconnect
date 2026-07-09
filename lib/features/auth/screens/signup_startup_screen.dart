@@ -20,7 +20,6 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
   final _startupNameController = TextEditingController();
   final _taglineController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _proofController = TextEditingController();
   String _category = 'Engineering';
   bool _obscure = true;
   int _step = 0;
@@ -33,7 +32,6 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
     _startupNameController.dispose();
     _taglineController.dispose();
     _descriptionController.dispose();
-    _proofController.dispose();
     super.dispose();
   }
 
@@ -47,7 +45,6 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
           tagline: _taglineController.text.trim(),
           description: _descriptionController.text.trim(),
           category: _category,
-          aluRecognitionProof: _proofController.text.trim(),
         );
   }
 
@@ -76,7 +73,7 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                    '🎉 Startup registered! Your profile is pending ALU verification.'),
+                    '🎉 Startup account created! You can start posting opportunities.'),
                 backgroundColor: AppColors.success,
                 duration: Duration(seconds: 4),
               ),
@@ -190,30 +187,8 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
         Text('Startup Profile', style: AppTextStyles.displayMedium),
         const SizedBox(height: 8),
         Text(
-          'Your startup will be reviewed by ALU admin before going live.',
+          'Tell us a bit about your startup.',
           style: AppTextStyles.bodyMedium,
-        ),
-
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.warning.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.verified_outlined, color: AppColors.warning, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Only ALU-recognized startups are approved. Provide valid proof of ALU recognition.',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning),
-                ),
-              ),
-            ],
-          ),
         ),
 
         const SizedBox(height: 24),
@@ -273,17 +248,6 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
         ),
         const SizedBox(height: 20),
 
-        const _Label('ALU Recognition Proof (URL)'),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _proofController,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            hintText: 'Link to ALU recognition letter / certificate',
-            prefixIcon: Icon(Icons.link_rounded, size: 20),
-          ),
-          validator: (v) => v == null || v.isEmpty ? 'Proof of ALU recognition required' : null,
-        ),
         const SizedBox(height: 32),
 
         BlocBuilder<AuthCubit, AuthState>(
@@ -296,7 +260,7 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
                       width: 22,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Submit for Verification',
+                  : const Text('Create Startup Account',
                       style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
             );
           },

@@ -99,7 +99,7 @@ class StartupModel extends Equatable {
       };
 
   // ALU verification removed: startups are always treated as approved.
-  bool get isApproved => true;
+  bool get isApproved => verificationStatus == 'approved';
   bool get isPending => false;
   bool get isRejected => false;
 

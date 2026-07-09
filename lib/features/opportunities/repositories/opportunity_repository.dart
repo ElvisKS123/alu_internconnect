@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/opportunity_model.dart';
 import '../../../core/constants/app_constants.dart';
@@ -9,29 +10,25 @@ class OpportunityRepository {
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
   // Stream of all open opportunities (real-time)
+  // NOTE: We intentionally query on a single equality field only
+  // (status == 'open') and do NOT chain .orderBy() or additional
+  // .where() clauses in Firestore. Combining an equality filter with
+  // orderBy on a different field -- or with multiple equality filters --
+  // requires a manually-created Firestore composite index. Rather than
+  // maintaining up to 8 different composite indexes for every possible
+  // combination of category/type/location filters, we fetch the
+  // single-field-indexed (automatic, no setup needed) result set and do
+  // all filtering + sorting client-side in Dart.
   Stream<List<OpportunityModel>> watchOpenOpportunities({
     String? category,
     String? type,
     String? location,
     String? searchQuery,
   }) {
-    Query query = _firestore
+    final query = _firestore
         .collection(AppConstants.opportunitiesCollection)
-        .where('status', isEqualTo: 'open')
-        .orderBy('createdAt', descending: true);
+        .where('status', isEqualTo: 'open');
 
-    if (category != null && category.isNotEmpty) {
-      query = query.where('category', isEqualTo: category);
-    }
-    if (type != null && type.isNotEmpty) {
-      query = query.where('type', isEqualTo: type);
-    }
-    if (location != null && location.isNotEmpty) {
-      query = query.where('location', isEqualTo: location);
-    }
-
-    // Use an async* stream to catch Firestore errors (eg. permission-denied)
-    // and yield an empty list instead of letting the stream error out.
     return (() async* {
       try {
         await for (final snapshot in query.snapshots()) {
@@ -39,6 +36,18 @@ class OpportunityRepository {
               .map((doc) => OpportunityModel.fromFirestore(doc))
               .toList();
 
+          if (category != null && category.isNotEmpty) {
+            opportunities =
+                opportunities.where((o) => o.category == category).toList();
+          }
+          if (type != null && type.isNotEmpty) {
+            opportunities =
+                opportunities.where((o) => o.type == type).toList();
+          }
+          if (location != null && location.isNotEmpty) {
+            opportunities =
+                opportunities.where((o) => o.location == location).toList();
+          }
           if (searchQuery != null && searchQuery.isNotEmpty) {
             final q = searchQuery.toLowerCase();
             opportunities = opportunities.where((o) {
@@ -48,68 +57,69 @@ class OpportunityRepository {
                   o.skills.any((s) => s.toLowerCase().contains(q));
             }).toList();
           }
+
+          opportunities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           yield opportunities;
         }
       } catch (e) {
-        // Log and yield empty list so UI can render.
-        try {
-          // StartupDebug may not be imported here; use print as fallback.
-          // But keep minimal dependency: print the error.
-          print('[OpportunityRepository] watchOpenOpportunities error: $e');
-        } catch (_) {}
+        debugPrint('[OpportunityRepository] watchOpenOpportunities error: $e');
         yield <OpportunityModel>[];
       }
     })();
   }
 
   // Stream of a startup's opportunities
+  // Same reasoning as above: equality-only query (no orderBy in Firestore),
+  // sorted client-side, so no composite index is needed.
   Stream<List<OpportunityModel>> watchStartupOpportunities(String startupId) {
     return (() async* {
       try {
         final stream = _firestore
             .collection(AppConstants.opportunitiesCollection)
             .where('startupId', isEqualTo: startupId)
-            .orderBy('createdAt', descending: true)
             .snapshots();
         await for (final snap in stream) {
-          yield snap.docs.map((doc) => OpportunityModel.fromFirestore(doc)).toList();
+          final opportunities = snap.docs
+              .map((doc) => OpportunityModel.fromFirestore(doc))
+              .toList();
+          opportunities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          yield opportunities;
         }
       } catch (e) {
-        print('[OpportunityRepository] watchStartupOpportunities error: $e');
+        debugPrint('[OpportunityRepository] watchStartupOpportunities error: $e');
         yield <OpportunityModel>[];
       }
     })();
   }
 
   // Get recommended opportunities for a student (based on skills)
+  // Again, single equality field only -- skills matching and sorting
+  // happen client-side so no composite/array-contains index is required.
   Future<List<OpportunityModel>> getRecommended({
     required List<String> studentSkills,
     int limit = 5,
   }) async {
     try {
-    if (studentSkills.isEmpty) {
-      // Return latest if no skills
       final snap = await _firestore
           .collection(AppConstants.opportunitiesCollection)
           .where('status', isEqualTo: 'open')
-          .orderBy('createdAt', descending: true)
-          .limit(limit)
           .get();
-      return snap.docs.map((doc) => OpportunityModel.fromFirestore(doc)).toList();
-    }
 
-    // Firestore array-contains-any allows up to 10 values
-    final skills = studentSkills.take(10).toList();
-    final snap = await _firestore
-        .collection(AppConstants.opportunitiesCollection)
-        .where('status', isEqualTo: 'open')
-        .where('skills', arrayContainsAny: skills)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .get();
-    return snap.docs.map((doc) => OpportunityModel.fromFirestore(doc)).toList();
+      var opportunities =
+          snap.docs.map((doc) => OpportunityModel.fromFirestore(doc)).toList();
+
+      if (studentSkills.isNotEmpty) {
+        final skillSet = studentSkills.map((s) => s.toLowerCase()).toSet();
+        opportunities = opportunities
+            .where((o) => o.skills.any(
+                (s) => skillSet.contains(s.toLowerCase())))
+            .toList();
+      }
+
+      opportunities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return opportunities.take(limit).toList();
     } catch (e) {
-      print('[OpportunityRepository] getRecommended error: $e');
+      debugPrint('[OpportunityRepository] getRecommended error: $e');
       return <OpportunityModel>[];
     }
   }
@@ -123,7 +133,7 @@ class OpportunityRepository {
       if (!doc.exists) return null;
       return OpportunityModel.fromFirestore(doc);
     } catch (e) {
-      print('[OpportunityRepository] getOpportunityById error: $e');
+      debugPrint('[OpportunityRepository] getOpportunityById error: $e');
       return null;
     }
   }
@@ -157,14 +167,21 @@ class OpportunityRepository {
 
     await ref.set(newOpp.toFirestore());
 
-    // Update startup counters
-    await _firestore
-        .collection(AppConstants.startupsCollection)
-        .doc(opportunity.startupId)
-        .update({
-      'totalOpportunities': FieldValue.increment(1),
-      'activeOpportunities': FieldValue.increment(1),
-    });
+    // Update startup counters. This is best-effort: the opportunity above
+    // has already been created successfully, so a failure here should not
+    // surface as an error to the user (it would look like the post failed
+    // when it actually succeeded, risking an accidental duplicate repost).
+    try {
+      await _firestore
+          .collection(AppConstants.startupsCollection)
+          .doc(opportunity.startupId)
+          .update({
+        'totalOpportunities': FieldValue.increment(1),
+        'activeOpportunities': FieldValue.increment(1),
+      });
+    } catch (e) {
+      debugPrint('[OpportunityRepository] createOpportunity counter update failed: $e');
+    }
 
     return newOpp;
   }
@@ -175,10 +192,14 @@ class OpportunityRepository {
         .doc(opportunityId)
         .update({'status': 'closed', 'updatedAt': Timestamp.now()});
 
-    await _firestore
-        .collection(AppConstants.startupsCollection)
-        .doc(startupId)
-        .update({'activeOpportunities': FieldValue.increment(-1)});
+    try {
+      await _firestore
+          .collection(AppConstants.startupsCollection)
+          .doc(startupId)
+          .update({'activeOpportunities': FieldValue.increment(-1)});
+    } catch (e) {
+      debugPrint('[OpportunityRepository] closeOpportunity counter update failed: $e');
+    }
   }
 
   // Bookmark / unbookmark

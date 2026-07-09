@@ -54,24 +54,6 @@ class StartupRepository {
     })();
   }
 
-  // For admin: all pending startups
-  Stream<List<StartupModel>> watchPendingStartups() {
-    return (() async* {
-      try {
-        final stream = _firestore
-            .collection(AppConstants.startupsCollection)
-            .where('verificationStatus', isEqualTo: 'pending')
-            .snapshots();
-        await for (final snap in stream) {
-          yield snap.docs.map((doc) => StartupModel.fromFirestore(doc)).toList();
-        }
-      } catch (e) {
-        print('[StartupRepository] watchPendingStartups error: $e');
-        yield <StartupModel>[];
-      }
-    })();
-  }
-
   Future<void> updateStartup(StartupModel startup) async {
     await _firestore
         .collection(AppConstants.startupsCollection)
@@ -82,25 +64,4 @@ class StartupRepository {
     });
   }
 
-  Future<void> approveStartup(String startupId, {String? note}) async {
-    await _firestore
-        .collection(AppConstants.startupsCollection)
-        .doc(startupId)
-        .update({
-      'verificationStatus': 'approved',
-      'verificationNote': note,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  Future<void> rejectStartup(String startupId, {required String reason}) async {
-    await _firestore
-        .collection(AppConstants.startupsCollection)
-        .doc(startupId)
-        .update({
-      'verificationStatus': 'rejected',
-      'verificationNote': reason,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
 }

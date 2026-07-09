@@ -204,51 +204,6 @@ class _StartupDashboardScreenState extends State<StartupDashboardScreen> {
   }
 }
 
-class _VerificationBanner extends StatelessWidget {
-  final String status;
-  const _VerificationBanner({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final isPending = status == 'pending';
-    return Container(
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isPending
-            ? AppColors.warning.withValues(alpha: 0.1)
-            : AppColors.error.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isPending
-              ? AppColors.warning.withValues(alpha: 0.3)
-              : AppColors.error.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isPending ? Icons.hourglass_top_rounded : Icons.cancel_outlined,
-            color: isPending ? AppColors.warning : AppColors.error,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              isPending
-                  ? 'Your startup is pending verification by ALU admin. You can\'t post opportunities yet.'
-                  : 'Your startup verification was rejected. Please contact ALU admin.',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: isPending ? AppColors.warning : AppColors.error,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StatsRow extends StatelessWidget {
   final StartupModel startup;
   const _StatsRow({required this.startup});

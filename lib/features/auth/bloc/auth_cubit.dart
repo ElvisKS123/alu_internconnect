@@ -100,7 +100,6 @@ class AuthCubit extends Cubit<AuthState> {
     required String tagline,
     required String description,
     required String category,
-    required String aluRecognitionProof,
   }) async {
     emit(AuthLoading());
     try {
@@ -112,7 +111,6 @@ class AuthCubit extends Cubit<AuthState> {
         tagline: tagline,
         description: description,
         category: category,
-        aluRecognitionProof: aluRecognitionProof,
       );
       emit(AuthAuthenticated(user));
     } on Exception catch (e) {
