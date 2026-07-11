@@ -15,6 +15,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String? _selectedCategory;
+
   @override
   void initState() {
     super.initState();
@@ -232,39 +234,37 @@ class _HomeScreenState extends State<HomeScreen> {
                               _CategoryChip(
                                 label: 'Design',
                                 icon: Icons.palette_outlined,
-                                onTap: () {
-                                  context.read<OpportunityCubit>().filterOpportunities(category: 'Design');
-                                  context.go('/explore');
-                                },
+                                isSelected: _selectedCategory == 'Design',
+                                onTap: () => setState(() => _selectedCategory =
+                                    _selectedCategory == 'Design' ? null : 'Design'),
                               ),
                               _CategoryChip(
                                 label: 'Engineering',
                                 icon: Icons.code_rounded,
-                                onTap: () {
-                                  context.read<OpportunityCubit>().filterOpportunities(category: 'Engineering');
-                                  context.go('/explore');
-                                },
+                                isSelected: _selectedCategory == 'Engineering',
+                                onTap: () => setState(() => _selectedCategory =
+                                    _selectedCategory == 'Engineering' ? null : 'Engineering'),
                               ),
                               _CategoryChip(
                                 label: 'Marketing',
                                 icon: Icons.campaign_outlined,
-                                onTap: () {
-                                  context.read<OpportunityCubit>().filterOpportunities(category: 'Marketing');
-                                  context.go('/explore');
-                                },
+                                isSelected: _selectedCategory == 'Marketing',
+                                onTap: () => setState(() => _selectedCategory =
+                                    _selectedCategory == 'Marketing' ? null : 'Marketing'),
                               ),
                               _CategoryChip(
                                 label: 'Data',
                                 icon: Icons.bar_chart_rounded,
-                                onTap: () {
-                                  context.read<OpportunityCubit>().filterOpportunities(category: 'Data');
-                                  context.go('/explore');
-                                },
+                                isSelected: _selectedCategory == 'Data',
+                                onTap: () => setState(() => _selectedCategory =
+                                    _selectedCategory == 'Data' ? null : 'Data'),
                               ),
                               _CategoryChip(
                                 label: 'Other',
                                 icon: Icons.more_horiz_rounded,
-                                onTap: () => context.go('/explore'),
+                                isSelected: _selectedCategory == 'Other',
+                                onTap: () => setState(() => _selectedCategory =
+                                    _selectedCategory == 'Other' ? null : 'Other'),
                               ),
                             ],
                           ),
@@ -277,9 +277,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
-                    child: Text(
-                      user.isStartup ? 'Your Opportunities' : 'Recent opportunities',
-                      style: AppTextStyles.headlineMedium,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          user.isStartup
+                              ? 'Your Opportunities'
+                              : _selectedCategory != null
+                                  ? '$_selectedCategory opportunities'
+                                  : 'Recent opportunities',
+                          style: AppTextStyles.headlineMedium,
+                        ),
+                        if (!user.isStartup && _selectedCategory != null)
+                          GestureDetector(
+                            onTap: () => setState(() => _selectedCategory = null),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Clear',
+                                  style: AppTextStyles.labelMedium
+                                      .copyWith(color: AppColors.primary),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(Icons.close_rounded,
+                                    size: 16, color: AppColors.primary),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -298,7 +323,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       return const SliverToBoxAdapter(child: SizedBox());
                     }
 
-                    final opportunities = state.opportunities.take(5).toList();
+                    final opportunities = (user.isStartup
+                            ? state.opportunities
+                                .where((o) => o.startupId == user.id)
+                            : _selectedCategory != null
+                                ? state.opportunities
+                                    .where((o) => o.category == _selectedCategory)
+                                : state.opportunities)
+                        .take(_selectedCategory != null ? 20 : 5)
+                        .toList();
                     if (opportunities.isEmpty) {
                       return SliverToBoxAdapter(
                         child: Padding(
@@ -308,8 +341,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               const Icon(Icons.inbox_outlined,
                                   size: 48, color: AppColors.textTertiary),
                               const SizedBox(height: 12),
-                              Text('No opportunities yet',
-                                  style: AppTextStyles.bodyMedium),
+                              Text(
+                                _selectedCategory != null
+                                    ? 'No $_selectedCategory opportunities yet'
+                                    : 'No opportunities yet',
+                                style: AppTextStyles.bodyMedium,
+                              ),
                             ],
                           ),
                         ),
@@ -420,11 +457,13 @@ class _CategoryChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
+  final bool isSelected;
 
   const _CategoryChip({
     required this.label,
     required this.icon,
     required this.onTap,
+    this.isSelected = false,
   });
 
   @override
@@ -435,9 +474,12 @@ class _CategoryChip extends StatelessWidget {
         width: 76,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: isSelected ? AppColors.primaryLight : AppColors.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+            width: isSelected ? 1.5 : 1,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -445,13 +487,21 @@ class _CategoryChip extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.primaryLight,
+                color: isSelected ? AppColors.primary : AppColors.primaryLight,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: AppColors.primary, size: 20),
+              child: Icon(icon,
+                  color: isSelected ? Colors.white : AppColors.primary, size: 20),
             ),
             const SizedBox(height: 6),
-            Text(label, style: AppTextStyles.bodySmall, textAlign: TextAlign.center),
+            Text(
+              label,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: isSelected ? AppColors.primary : null,
+                fontWeight: isSelected ? FontWeight.w700 : null,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),

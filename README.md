@@ -84,7 +84,7 @@ lib/
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/alu_internconnect.git
+git clone https://github.com/ElvisKS123/alu_internconnect.git
 cd alu_internconnect
 ```
 
@@ -98,7 +98,7 @@ flutter pub get
 **a) Create Firebase project**
 1. Go to [console.firebase.google.com](https://console.firebase.google.com)
 2. Click **Add project** → name it `alu-internconnect`
-3. Enable **Google Analytics** (optional)
+
 
 **b) Enable Firebase services**
 - **Authentication** → Sign-in method → Email/Password → Enable
@@ -148,7 +148,7 @@ All Cubits are provided at the app root via `MultiBlocProvider` and repositories
 
 Security rules are in `firestore.rules`. Key rules:
 - Students can only read/write their own applications
-- Only **approved** startups can post opportunities
+- Startups can post opportunities
 - Startup owners can update application status
 - Admin role can approve/reject startups
 

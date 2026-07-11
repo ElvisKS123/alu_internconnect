@@ -282,10 +282,21 @@ class _ApplicantCard extends StatelessWidget {
     required this.onUpdateStatus,
   });
 
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ApplicantDetailSheet(
+        application: application,
+        onUpdateStatus: onUpdateStatus,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -294,177 +305,423 @@ class _ApplicantCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppColors.primaryLight,
-                child: Text(
-                  application.applicantName.isNotEmpty
-                      ? application.applicantName[0].toUpperCase()
-                      : '?',
-                  style: AppTextStyles.titleMedium
-                      .copyWith(color: AppColors.primary),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
+          Material(
+            color: Colors.transparent,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: InkWell(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              onTap: () => _openDetail(context),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(application.applicantName,
-                        style: AppTextStyles.titleMedium),
-                    Text(application.opportunityTitle,
-                        style: AppTextStyles.bodySmall),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: AppColors.primaryLight,
+                          child: Text(
+                            application.applicantName.isNotEmpty
+                                ? application.applicantName[0].toUpperCase()
+                                : '?',
+                            style: AppTextStyles.titleMedium
+                                .copyWith(color: AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(application.applicantName,
+                                  style: AppTextStyles.titleMedium),
+                              Text(application.opportunityTitle,
+                                  style: AppTextStyles.bodySmall),
+                            ],
+                          ),
+                        ),
+                        _StatusBadge(status: application.status),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: AppColors.textTertiary, size: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.email_outlined,
+                            size: 15, color: AppColors.textTertiary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            application.applicantEmail,
+                            style: AppTextStyles.bodySmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (application.relevantSkills.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: application.relevantSkills
+                            .map((s) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    s,
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.primary, fontSize: 11),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                    if (application.coverLetter.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+                      Text(
+                        application.coverLetter.length > 120
+                            ? '${application.coverLetter.substring(0, 120)}...'
+                            : application.coverLetter,
+                        style: AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                    if (application.portfolioUrl != null &&
+                            application.portfolioUrl!.isNotEmpty ||
+                        application.resumeUrl != null &&
+                            application.resumeUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 16,
+                        children: [
+                          if (application.portfolioUrl != null &&
+                              application.portfolioUrl!.isNotEmpty)
+                            _LinkChip(
+                              icon: Icons.link_rounded,
+                              label: 'Portfolio',
+                              url: application.portfolioUrl!,
+                            ),
+                          if (application.resumeUrl != null &&
+                              application.resumeUrl!.isNotEmpty)
+                            _LinkChip(
+                              icon: Icons.description_outlined,
+                              label: 'Resume',
+                              url: application.resumeUrl!,
+                            ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'Tap to view full application',
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.textTertiary, fontSize: 11),
+                    ),
                   ],
                 ),
               ),
-              _StatusBadge(status: application.status),
-            ],
+            ),
           ),
-          const SizedBox(height: 10),
-          Row(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: _ApplicantActionButtons(
+              status: application.status,
+              onUpdateStatus: onUpdateStatus,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ApplicantActionButtons extends StatelessWidget {
+  final String status;
+  final ValueChanged<String> onUpdateStatus;
+
+  const _ApplicantActionButtons({
+    required this.status,
+    required this.onUpdateStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == 'pending' || status == 'under_review') {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => onUpdateStatus('shortlisted'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 38),
+                foregroundColor: AppColors.success,
+                side: const BorderSide(color: AppColors.success),
+              ),
+              child: const Text('Shortlist'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => onUpdateStatus('under_review'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 38),
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+              ),
+              child: const Text('Review'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => onUpdateStatus('rejected'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 38),
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+              ),
+              child: const Text('Reject'),
+            ),
+          ),
+        ],
+      );
+    }
+    if (status == 'shortlisted') {
+      return Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => onUpdateStatus('accepted'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+                minimumSize: const Size(0, 38),
+              ),
+              child: const Text('Accept', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => onUpdateStatus('rejected'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 38),
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+              ),
+              child: const Text('Reject'),
+            ),
+          ),
+        ],
+      );
+    }
+    return const SizedBox();
+  }
+}
+
+class _ApplicantDetailSheet extends StatelessWidget {
+  final ApplicationModel application;
+  final ValueChanged<String> onUpdateStatus;
+
+  const _ApplicantDetailSheet({
+    required this.application,
+    required this.onUpdateStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
             children: [
-              const Icon(Icons.email_outlined, size: 15, color: AppColors.textTertiary),
-              const SizedBox(width: 6),
+              const SizedBox(height: 10),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               Expanded(
-                child: Text(
-                  application.applicantEmail,
-                  style: AppTextStyles.bodySmall,
-                  overflow: TextOverflow.ellipsis,
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: AppColors.primaryLight,
+                          child: Text(
+                            application.applicantName.isNotEmpty
+                                ? application.applicantName[0].toUpperCase()
+                                : '?',
+                            style: AppTextStyles.titleLarge
+                                .copyWith(color: AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(application.applicantName,
+                                  style: AppTextStyles.displayMedium),
+                              const SizedBox(height: 2),
+                              Text(application.applicantEmail,
+                                  style: AppTextStyles.bodyMedium),
+                            ],
+                          ),
+                        ),
+                        _StatusBadge(status: application.status),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _DetailRow(
+                      icon: Icons.work_outline_rounded,
+                      label: 'Applied for',
+                      value: application.opportunityTitle,
+                    ),
+                    _DetailRow(
+                      icon: Icons.schedule_rounded,
+                      label: 'Applied',
+                      value: application.timeAgo,
+                    ),
+                    if (application.relevantSkills.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text('Skills', style: AppTextStyles.labelLarge),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: application.relevantSkills
+                            .map((s) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    s,
+                                    style: AppTextStyles.bodySmall
+                                        .copyWith(color: AppColors.primary),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                    if (application.portfolioUrl != null &&
+                            application.portfolioUrl!.isNotEmpty ||
+                        application.resumeUrl != null &&
+                            application.resumeUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text('Links', style: AppTextStyles.labelLarge),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 20,
+                        children: [
+                          if (application.portfolioUrl != null &&
+                              application.portfolioUrl!.isNotEmpty)
+                            _LinkChip(
+                              icon: Icons.link_rounded,
+                              label: 'Portfolio',
+                              url: application.portfolioUrl!,
+                            ),
+                          if (application.resumeUrl != null &&
+                              application.resumeUrl!.isNotEmpty)
+                            _LinkChip(
+                              icon: Icons.description_outlined,
+                              label: 'Resume',
+                              url: application.resumeUrl!,
+                            ),
+                        ],
+                      ),
+                    ],
+                    if (application.coverLetter.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text('Cover Letter', style: AppTextStyles.labelLarge),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          application.coverLetter,
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ),
+                    ],
+                    if (application.startupNote != null &&
+                        application.startupNote!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text('Your Note', style: AppTextStyles.labelLarge),
+                      const SizedBox(height: 8),
+                      Text(application.startupNote!,
+                          style: AppTextStyles.bodyMedium),
+                    ],
+                    const SizedBox(height: 24),
+                    _ApplicantActionButtons(
+                      status: application.status,
+                      onUpdateStatus: (status) {
+                        onUpdateStatus(status);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          if (application.relevantSkills.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: application.relevantSkills
-                  .map((s) => Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          s,
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.primary, fontSize: 11),
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ],
-          if (application.coverLetter.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-            Text(
-              application.coverLetter.length > 120
-                  ? '${application.coverLetter.substring(0, 120)}...'
-                  : application.coverLetter,
-              style: AppTextStyles.bodyMedium,
-            ),
-          ],
-          if (application.portfolioUrl != null &&
-                  application.portfolioUrl!.isNotEmpty ||
-              application.resumeUrl != null &&
-                  application.resumeUrl!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 16,
-              children: [
-                if (application.portfolioUrl != null &&
-                    application.portfolioUrl!.isNotEmpty)
-                  _LinkChip(
-                    icon: Icons.link_rounded,
-                    label: 'Portfolio',
-                    url: application.portfolioUrl!,
-                  ),
-                if (application.resumeUrl != null &&
-                    application.resumeUrl!.isNotEmpty)
-                  _LinkChip(
-                    icon: Icons.description_outlined,
-                    label: 'Resume',
-                    url: application.resumeUrl!,
-                  ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 12),
-          // Action buttons
-          if (application.status == 'pending' ||
-              application.status == 'under_review')
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => onUpdateStatus('shortlisted'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 38),
-                      foregroundColor: AppColors.success,
-                      side: const BorderSide(color: AppColors.success),
-                    ),
-                    child: const Text('Shortlist'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => onUpdateStatus('under_review'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 38),
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
-                    ),
-                    child: const Text('Review'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => onUpdateStatus('rejected'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 38),
-                      foregroundColor: AppColors.error,
-                      side: const BorderSide(color: AppColors.error),
-                    ),
-                    child: const Text('Reject'),
-                  ),
-                ),
-              ],
-            ),
-          if (application.status == 'shortlisted')
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => onUpdateStatus('accepted'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      minimumSize: const Size(0, 38),
-                    ),
-                    child: const Text('Accept',
-                        style: TextStyle(color: Colors.white)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => onUpdateStatus('rejected'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 38),
-                      foregroundColor: AppColors.error,
-                      side: const BorderSide(color: AppColors.error),
-                    ),
-                    child: const Text('Reject'),
-                  ),
-                ),
-              ],
-            ),
+        );
+      },
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: AppColors.textTertiary),
+          const SizedBox(width: 10),
+          Text('$label: ', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary)),
+          Expanded(
+            child: Text(value, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
