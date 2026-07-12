@@ -9,7 +9,12 @@ import '../models/opportunity_model.dart';
 import '../repositories/opportunity_repository.dart';
 
 class CreateOpportunityScreen extends StatefulWidget {
-  const CreateOpportunityScreen({super.key});
+  // When set, the screen opens in "edit an existing opportunity" mode.
+  final String? opportunityId;
+
+  const CreateOpportunityScreen({super.key, this.opportunityId});
+
+  bool get isEditMode => opportunityId != null;
 
   @override
   State<CreateOpportunityScreen> createState() => _CreateOpportunityScreenState();
@@ -30,6 +35,48 @@ class _CreateOpportunityScreenState extends State<CreateOpportunityScreen> {
   final List<String> _selectedSkills = [];
   final List<String> _selectedTags = [];
   bool _isSubmitting = false;
+  OpportunityModel? _existingOpportunity;
+  bool _isLoadingExisting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isEditMode) {
+      _isLoadingExisting = true;
+      _loadExisting();
+    }
+  }
+
+  Future<void> _loadExisting() async {
+    final opp = await context
+        .read<OpportunityRepository>()
+        .getOpportunityById(widget.opportunityId!);
+    if (!mounted) return;
+    if (opp != null) {
+      _titleController.text = opp.title;
+      _descriptionController.text = opp.description;
+      _hoursController.text = opp.hoursPerWeek ?? '';
+      _durationController.text = opp.duration ?? '';
+      _compensationController.text = opp.compensation ?? '';
+      setState(() {
+        _existingOpportunity = opp;
+        _category = opp.category;
+        _type = opp.type;
+        _location = opp.location;
+        _isPaid = opp.isPaid;
+        _deadline = opp.deadline;
+        _selectedSkills
+          ..clear()
+          ..addAll(opp.skills);
+        _selectedTags
+          ..clear()
+          ..addAll(opp.tags);
+        _isLoadingExisting = false;
+      });
+    } else {
+      setState(() => _isLoadingExisting = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -56,11 +103,59 @@ class _CreateOpportunityScreenState extends State<CreateOpportunityScreen> {
       final authState = context.read<AuthCubit>().state;
       if (authState is! AuthAuthenticated) return;
 
+      final opportunityRepository = context.read<OpportunityRepository>();
+
+      if (widget.isEditMode) {
+        if (_existingOpportunity == null) {
+          setState(() => _isSubmitting = false);
+          return;
+        }
+
+        final updated = OpportunityModel(
+          id: _existingOpportunity!.id,
+          startupId: _existingOpportunity!.startupId,
+          startupName: _existingOpportunity!.startupName,
+          startupLogoUrl: _existingOpportunity!.startupLogoUrl,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          category: _category,
+          skills: _selectedSkills,
+          tags: _selectedTags,
+          type: _type,
+          location: _location,
+          hoursPerWeek: _hoursController.text.trim().isNotEmpty
+              ? _hoursController.text.trim()
+              : null,
+          duration: _durationController.text.trim().isNotEmpty
+              ? _durationController.text.trim()
+              : null,
+          isPaid: _isPaid,
+          compensation: _isPaid && _compensationController.text.trim().isNotEmpty
+              ? _compensationController.text.trim()
+              : null,
+          applicationCount: _existingOpportunity!.applicationCount,
+          status: _existingOpportunity!.status,
+          deadline: _deadline,
+          createdAt: _existingOpportunity!.createdAt,
+          updatedAt: DateTime.now(),
+        );
+
+        await opportunityRepository.updateOpportunity(updated);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Opportunity updated successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        if (mounted) context.pop();
+        return;
+      }
+
       debugPrint('[CreateOpportunity] posting by startupId=${authState.user.id}');
 
-
       final startupRepository = context.read<StartupRepository>();
-      final opportunityRepository = context.read<OpportunityRepository>();
 
       final startup = await startupRepository.getStartupById(authState.user.id);
 
@@ -130,6 +225,9 @@ class _CreateOpportunityScreenState extends State<CreateOpportunityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingExisting) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -137,7 +235,7 @@ class _CreateOpportunityScreenState extends State<CreateOpportunityScreen> {
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => context.pop(),
         ),
-        title: const Text('Post Opportunity'),
+        title: Text(widget.isEditMode ? 'Edit Opportunity' : 'Post Opportunity'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -420,8 +518,8 @@ class _CreateOpportunityScreenState extends State<CreateOpportunityScreen> {
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text('Post Opportunity',
-                        style: TextStyle(
+                    : Text(widget.isEditMode ? 'Save Changes' : 'Post Opportunity',
+                        style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.w600)),

@@ -7,6 +7,7 @@ class AppConstants {
   static const String bookmarksCollection = 'bookmarks';
   static const String notificationsCollection = 'notifications';
   static const String verificationsCollection = 'startup_verifications';
+  static const String aluStartupCodesCollection = 'alu_startup_codes';
   static const String chatsCollection = 'chats';
   static const String messagesCollection = 'messages';
 

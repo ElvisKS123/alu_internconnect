@@ -11,6 +11,8 @@ import 'features/opportunities/repositories/opportunity_repository.dart';
 import 'features/applications/bloc/application_cubit.dart';
 import 'features/applications/repositories/application_repository.dart';
 import 'features/startup/repositories/startup_repository.dart';
+import 'features/notifications/bloc/notification_cubit.dart';
+import 'features/notifications/repositories/notification_repository.dart';
 import 'config/router.dart';
 import 'firebase_options.dart';
 
@@ -48,6 +50,7 @@ class ALUInternConnectApp extends StatelessWidget {
     final opportunityRepository = OpportunityRepository();
     final applicationRepository = ApplicationRepository();
     final startupRepository = StartupRepository();
+    final notificationRepository = NotificationRepository();
 
     return MultiRepositoryProvider(
       providers: [
@@ -57,6 +60,8 @@ class ALUInternConnectApp extends StatelessWidget {
         RepositoryProvider<ApplicationRepository>.value(
             value: applicationRepository),
         RepositoryProvider<StartupRepository>.value(value: startupRepository),
+        RepositoryProvider<NotificationRepository>.value(
+            value: notificationRepository),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -71,6 +76,10 @@ class ALUInternConnectApp extends StatelessWidget {
           BlocProvider<ApplicationCubit>(
             create: (_) =>
                 ApplicationCubit(repository: applicationRepository),
+          ),
+          BlocProvider<NotificationCubit>(
+            create: (_) =>
+                NotificationCubit(repository: notificationRepository),
           ),
         ],
         child: _AppRouter(),

@@ -98,10 +98,9 @@ class StartupModel extends Equatable {
         'updatedAt': Timestamp.fromDate(updatedAt),
       };
 
-  // ALU verification removed: startups are always treated as approved.
   bool get isApproved => verificationStatus == 'approved';
-  bool get isPending => false;
-  bool get isRejected => false;
+  bool get isPending => verificationStatus == 'pending';
+  bool get isRejected => verificationStatus == 'rejected';
 
 
   @override

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/bloc/auth_cubit.dart';
 import '../../applications/bloc/application_cubit.dart';
+import '../../startup/repositories/startup_repository.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -37,7 +38,7 @@ class ProfileScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
               child: Column(
                 children: [
-                  // ── Header ──────────────────────────────────────────
+                  // ── Header ───
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -53,7 +54,7 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  // ── Avatar ──────────────────────────────────────────
+                  // ── Avatar ───
                   CircleAvatar(
                     radius: 44,
                     backgroundColor: AppColors.primaryLight,
@@ -79,7 +80,7 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  // ── Stats ────────────────────────────────────────────
+                  // ── Stats ───
                   if (user.isStudent)
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -101,7 +102,7 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // ── Menu items ───────────────────────────────────────
+                  // ── Menu items ───
                   Container(
                     decoration: BoxDecoration(
                       color: AppColors.surface,
@@ -110,28 +111,52 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _MenuItem(
-                          icon: Icons.person_outline_rounded,
-                          label: 'My Profile',
-                          onTap: () => context.push('/profile/edit'),
-                        ),
-                        _Separator(),
-                        _MenuItem(
-                          icon: Icons.star_outline_rounded,
-                          label: 'Skills & Interests',
-                          onTap: () => context.push('/profile/edit'),
-                        ),
-                        _Separator(),
-                        _MenuItem(
-                          icon: Icons.bookmark_outline_rounded,
-                          label: 'Saved Opportunities',
-                          onTap: () => context.go('/explore'),
-                        ),
+                        if (user.isStartup) ...[
+                          _MenuItem(
+                            icon: Icons.business_outlined,
+                            label: 'Edit Startup Information',
+                            onTap: () async {
+                              final startup = await context
+                                  .read<StartupRepository>()
+                                  .getStartupById(user.id);
+                              if (!context.mounted) return;
+                              if (startup == null) {
+                                context.push('/startup/register');
+                              } else {
+                                context.push('/startup/edit');
+                              }
+                            },
+                          ),
+                          _Separator(),
+                          _MenuItem(
+                            icon: Icons.person_outline_rounded,
+                            label: 'Account Details',
+                            onTap: () => context.push('/profile/edit'),
+                          ),
+                        ] else ...[
+                          _MenuItem(
+                            icon: Icons.person_outline_rounded,
+                            label: 'My Profile',
+                            onTap: () => context.push('/profile/edit'),
+                          ),
+                          _Separator(),
+                          _MenuItem(
+                            icon: Icons.star_outline_rounded,
+                            label: 'Skills & Interests',
+                            onTap: () => context.push('/profile/edit'),
+                          ),
+                          _Separator(),
+                          _MenuItem(
+                            icon: Icons.bookmark_outline_rounded,
+                            label: 'Saved Opportunities',
+                            onTap: () => context.push('/saved'),
+                          ),
+                        ],
                         _Separator(),
                         _MenuItem(
                           icon: Icons.notifications_none_rounded,
                           label: 'Notifications',
-                          onTap: () {},
+                          onTap: () => context.push('/notifications'),
                         ),
                         _Separator(),
                         _MenuItem(

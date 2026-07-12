@@ -79,7 +79,7 @@ class _OpportunityDetailScreenState extends State<OpportunityDetailScreen> {
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // ── App bar ──────────────────────────────────────────────────
+          // ── App bar ───
           SliverAppBar(
             pinned: true,
             backgroundColor: AppColors.background,
@@ -104,7 +104,7 @@ class _OpportunityDetailScreenState extends State<OpportunityDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header card ────────────────────────────────────────
+                  // ── Header card ───
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -195,14 +195,14 @@ class _OpportunityDetailScreenState extends State<OpportunityDetailScreen> {
 
                   const SizedBox(height: 20),
 
-                  // ── About ──────────────────────────────────────────────
+                  // ── About ──
                   Text('About', style: AppTextStyles.headlineMedium),
                   const SizedBox(height: 10),
                   Text(opp.description, style: AppTextStyles.bodyLarge.copyWith(height: 1.6)),
 
                   const SizedBox(height: 24),
 
-                  // ── Skills required ────────────────────────────────────
+                  // ── Skills required ──
                   if (opp.skills.isNotEmpty) ...[
                     Text('Skills required', style: AppTextStyles.headlineMedium),
                     const SizedBox(height: 10),
@@ -214,7 +214,7 @@ class _OpportunityDetailScreenState extends State<OpportunityDetailScreen> {
                     const SizedBox(height: 24),
                   ],
 
-                  // ── Application count ──────────────────────────────────
+                  // ── Application count ──
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -249,7 +249,7 @@ class _OpportunityDetailScreenState extends State<OpportunityDetailScreen> {
         ],
       ),
 
-      // ── Bottom CTA ────────────────────────────────────────────────────
+      // ── Bottom CTA ───
       bottomNavigationBar: isStudent
           ? SafeArea(
               child: Padding(

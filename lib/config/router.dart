@@ -12,12 +12,17 @@ import '../features/home/screens/home_screen.dart';
 import '../features/opportunities/screens/explore_screen.dart';
 import '../features/opportunities/screens/opportunity_detail_screen.dart';
 import '../features/opportunities/screens/create_opportunity_screen.dart';
+import '../features/opportunities/screens/saved_opportunities_screen.dart';
 import '../features/applications/screens/applications_screen.dart';
 import '../features/applications/screens/apply_screen.dart';
+import '../features/applications/screens/application_detail_screen.dart';
+import '../features/notifications/screens/notifications_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
 import '../features/profile/screens/edit_profile_screen.dart';
 import '../features/startup/screens/startup_profile_screen.dart';
 import '../features/startup/screens/startup_dashboard_screen.dart';
+import '../features/startup/screens/startup_registration_screen.dart';
+import '../features/startup/screens/edit_startup_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -49,21 +54,29 @@ GoRouter createRouter(AuthCubit authCubit) {
       if (authState is AuthInitial || authState is AuthLoading) {
         return null;
       }
-      if (!isLoggedIn && !isOnAuthPage) return '/onboarding';
+      if (!isLoggedIn && !isOnAuthPage) {
+        
+        return authState is AuthLoggedOut ? '/auth/login' : '/onboarding';
+      }
       if (isLoggedIn && isOnAuthPage) return '/home';
 
-      // Role-based guards: keep students out of startup-only screens and
-      // vice versa, even if they land on the route via a deep link.
+      
       if (isLoggedIn) {
         final isStartup = authState.user.isStartup;
         final location = state.matchedLocation;
 
-        const startupOnlyRoutes = ['/startup/dashboard', '/opportunity/create'];
+        const startupOnlyRoutes = [
+          '/startup/dashboard',
+          '/startup/register',
+          '/startup/edit',
+          '/opportunity/create',
+        ];
         final isStartupOnlyRoute =
-            startupOnlyRoutes.any((r) => location.startsWith(r));
+            startupOnlyRoutes.any((r) => location.startsWith(r)) ||
+                (location.startsWith('/opportunity/') && location.endsWith('/edit'));
         if (isStartupOnlyRoute && !isStartup) return '/home';
 
-        const studentOnlyRoutes = ['/applications'];
+        const studentOnlyRoutes = ['/applications', '/application/', '/saved'];
         final isStudentOnlyRoute =
             studentOnlyRoutes.any((r) => location.startsWith(r));
         if (isStudentOnlyRoute && isStartup) return '/home';
@@ -118,12 +131,7 @@ GoRouter createRouter(AuthCubit authCubit) {
           ),
         ],
       ),
-      // NOTE: static routes like '/opportunity/create' must be declared
-      // BEFORE the dynamic '/opportunity/:id' route. go_router matches
-      // routes in declaration order, and ':id' matches any segment
-      // (including the literal word "create"), so if the dynamic route
-      // came first it would swallow '/opportunity/create' and render
-      // OpportunityDetailScreen with id="create" -> "Opportunity not found."
+      
       GoRoute(
         path: '/opportunity/create',
         builder: (_, __) => const CreateOpportunityScreen(),
@@ -138,7 +146,37 @@ GoRouter createRouter(AuthCubit authCubit) {
         path: '/opportunity/:id/apply',
         builder: (context, state) => ApplyScreen(
           opportunityId: state.pathParameters['id']!,
+          applicationId: state.uri.queryParameters['applicationId'],
         ),
+      ),
+      GoRoute(
+        path: '/opportunity/:id/edit',
+        builder: (context, state) => CreateOpportunityScreen(
+          opportunityId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/application/:id',
+        builder: (context, state) => ApplicationDetailScreen(
+          applicationId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/saved',
+        builder: (_, __) => const SavedOpportunitiesScreen(),
+      ),
+      
+      GoRoute(
+        path: '/startup/register',
+        builder: (_, __) => const StartupRegistrationScreen(),
+      ),
+      GoRoute(
+        path: '/startup/edit',
+        builder: (_, __) => const EditStartupScreen(),
       ),
       GoRoute(
         path: '/startup/:id',

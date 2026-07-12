@@ -52,12 +52,12 @@ class _SignupStartupScreenState extends State<SignupStartupScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                    '🎉 Startup account created! You can start posting opportunities.'),
+                    '🎉 Startup account created! Register your startup to get started.'),
                 backgroundColor: AppColors.success,
                 duration: Duration(seconds: 4),
               ),
             );
-            context.go('/home');
+            context.go('/startup/dashboard');
           }
           if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(

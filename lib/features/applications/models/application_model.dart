@@ -19,6 +19,20 @@ class ApplicationModel extends Equatable {
   final String status; // pending | under_review | shortlisted | accepted | rejected | closed
   final String? startupNote; // feedback from startup
   final DateTime? interviewDate;
+  // Payment info, denormalized from the opportunity at the time of applying
+  // (same pattern as opportunityTitle/startupName above) so it stays
+  // accurate to what the student actually applied for even if the
+  // opportunity's compensation is edited later.
+  final bool isPaid;
+  final String? compensation;
+  // Rejection reason, required from the startup when rejecting an applicant.
+  final String? rejectionReason;
+  // Meeting scheduling info (set once the startup schedules a meeting with
+  // an accepted applicant).
+  final DateTime? meetingDate;
+  final String? meetingTime;
+  final String? meetingLocation;
+  final String? meetingStatus; // scheduled | completed | cancelled
   final DateTime appliedAt;
   final DateTime updatedAt;
 
@@ -40,6 +54,13 @@ class ApplicationModel extends Equatable {
     this.status = 'pending',
     this.startupNote,
     this.interviewDate,
+    this.isPaid = false,
+    this.compensation,
+    this.rejectionReason,
+    this.meetingDate,
+    this.meetingTime,
+    this.meetingLocation,
+    this.meetingStatus,
     required this.appliedAt,
     required this.updatedAt,
   });
@@ -64,6 +85,13 @@ class ApplicationModel extends Equatable {
       status: data['status'] ?? 'pending',
       startupNote: data['startupNote'],
       interviewDate: (data['interviewDate'] as Timestamp?)?.toDate(),
+      isPaid: data['isPaid'] ?? false,
+      compensation: data['compensation'],
+      rejectionReason: data['rejectionReason'],
+      meetingDate: (data['meetingDate'] as Timestamp?)?.toDate(),
+      meetingTime: data['meetingTime'],
+      meetingLocation: data['meetingLocation'],
+      meetingStatus: data['meetingStatus'],
       appliedAt: (data['appliedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -86,6 +114,13 @@ class ApplicationModel extends Equatable {
         'status': status,
         'startupNote': startupNote,
         'interviewDate': interviewDate != null ? Timestamp.fromDate(interviewDate!) : null,
+        'isPaid': isPaid,
+        'compensation': compensation,
+        'rejectionReason': rejectionReason,
+        'meetingDate': meetingDate != null ? Timestamp.fromDate(meetingDate!) : null,
+        'meetingTime': meetingTime,
+        'meetingLocation': meetingLocation,
+        'meetingStatus': meetingStatus,
         'appliedAt': Timestamp.fromDate(appliedAt),
         'updatedAt': Timestamp.fromDate(updatedAt),
       };
@@ -110,6 +145,38 @@ class ApplicationModel extends Equatable {
     return 'Just now';
   }
 
+  String get compensationDisplay {
+    if (!isPaid) return 'Unpaid / Volunteer';
+    if (compensation != null && compensation!.isNotEmpty) return compensation!;
+    return 'Paid';
+  }
+
+  bool get hasMeeting => meetingDate != null;
+
+  String get meetingStatusDisplay {
+    switch (meetingStatus) {
+      case 'scheduled': return 'Scheduled';
+      case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      default: return '';
+    }
+  }
+
+  // Whether the student is allowed to edit this application. Once a
+  // startup has accepted the applicant, editing is locked.
+  bool get isEditable =>
+      status == 'pending' || status == 'under_review' || status == 'shortlisted' || status == 'rejected';
+
   @override
-  List<Object?> get props => [id, opportunityId, applicantId, status];
+  List<Object?> get props => [
+        id,
+        opportunityId,
+        applicantId,
+        status,
+        rejectionReason,
+        meetingDate,
+        meetingTime,
+        meetingLocation,
+        meetingStatus,
+      ];
 }

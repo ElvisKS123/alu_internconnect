@@ -57,7 +57,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ────────────────────────────────────────────────
+            // ── Header ───
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
@@ -75,7 +75,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
 
-            // ── Search bar ─────────────────────────────────────────────
+            // ── Search bar ───
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: TextFormField(
@@ -97,7 +97,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
 
-            // ── Filter chips row ───────────────────────────────────────
+            // ── Filter chips row ──
             const SizedBox(height: 14),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -154,7 +154,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
             const SizedBox(height: 16),
 
-            // ── Results ────────────────────────────────────────────────
+            // ── Results ───
             Expanded(
               child: BlocBuilder<OpportunityCubit, OpportunityState>(
                 builder: (context, state) {

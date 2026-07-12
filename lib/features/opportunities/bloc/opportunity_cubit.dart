@@ -4,7 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../models/opportunity_model.dart';
 import '../repositories/opportunity_repository.dart';
 
-// ─── States ───────────────────────────────────────────────────────────────────
+// ─── States ────
 
 abstract class OpportunityState extends Equatable {
   const OpportunityState();
@@ -73,7 +73,7 @@ class OpportunityError extends OpportunityState {
   List<Object?> get props => [message];
 }
 
-// ─── Cubit ────────────────────────────────────────────────────────────────────
+// ─── Cubit ───
 
 class OpportunityCubit extends Cubit<OpportunityState> {
   final OpportunityRepository _repository;
@@ -82,9 +82,7 @@ class OpportunityCubit extends Cubit<OpportunityState> {
   String? _userId;
   List<String> _userSkills = [];
 
-  // Cached pieces of state that may arrive in any order (stream snapshot,
-  // one-time recommended fetch, bookmarks stream). We keep them here so
-  // whichever arrives first doesn't get dropped while waiting on the others.
+  
   List<OpportunityModel>? _cachedOpportunities;
   List<OpportunityModel> _cachedRecommended = [];
   List<String> _cachedBookmarks = [];
@@ -105,11 +103,10 @@ class OpportunityCubit extends Cubit<OpportunityState> {
     _loadRecommended();
   }
 
-  // Builds/emits OpportunitiesLoaded from whatever cached pieces we have so
-  // far, as soon as the opportunities list itself has arrived at least once.
+  
   void _emitCurrent() {
     final opportunities = _cachedOpportunities;
-    if (opportunities == null) return; // still waiting on first snapshot
+    if (opportunities == null) return; 
     emit(OpportunitiesLoaded(
       opportunities: opportunities,
       recommended: _cachedRecommended,

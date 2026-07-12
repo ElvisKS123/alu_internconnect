@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
-import '../../startup/models/startup_model.dart';
 
 class AuthRepository {
   final FirebaseAuth _auth;
@@ -98,26 +97,7 @@ class AuthRepository {
         .doc(credential.user!.uid)
         .set(user.toFirestore());
 
-    // Startup profile fields (name, tagline, category, description) are no
-    // longer collected at signup. Fill sensible placeholders here; the
-    // startup can fill in real details later from their profile screen.
-    final startup = StartupModel(
-      id: credential.user!.uid,
-      ownerId: credential.user!.uid,
-      name: "$fullName's Startup",
-      tagline: '',
-      description: '',
-      category: 'Engineering',
-      verificationStatus: 'approved',
-      email: email,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    await _firestore
-        .collection('startups')
-        .doc(credential.user!.uid)
-        .set(startup.toFirestore());
+    
     await _cacheSession(role: 'startup', fullName: fullName);
 
     return user;
@@ -170,7 +150,7 @@ class AuthRepository {
             .doc(authUser.uid)
             .set(user.toFirestore(), SetOptions(merge: true));
       } catch (_) {
-        // Auth is already valid; keep the fallback profile in memory.
+       
       }
     }
     await _cacheSession(role: user.role, fullName: user.fullName);
@@ -192,7 +172,7 @@ class AuthRepository {
       final cachedRole = prefs.getString(_cachedRoleKey);
       final cachedFullName = prefs.getString(_cachedFullNameKey);
 
-      // Try to infer role from startups doc, but don't fail if it can't be read.
+      
       String recoveredRole;
       try {
         final startupDoc = await _firestore.collection('startups').doc(authUser.uid).get();
@@ -218,7 +198,7 @@ class AuthRepository {
         updatedAt: DateTime.now(),
       );
     } catch (_) {
-      // Firestore read failed due to rules/network: also fallback to auth data.
+      
       final prefs = await SharedPreferences.getInstance();
       final cachedRole = prefs.getString(_cachedRoleKey);
       final cachedFullName = prefs.getString(_cachedFullNameKey);

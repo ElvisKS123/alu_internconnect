@@ -183,7 +183,10 @@ class _ApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => context.push('/application/${application.id}'),
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -247,9 +250,10 @@ class _ApplicationCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.bookmark_outline_rounded,
+          const Icon(Icons.chevron_right_rounded,
               size: 20, color: AppColors.textTertiary),
         ],
+      ),
       ),
     );
   }

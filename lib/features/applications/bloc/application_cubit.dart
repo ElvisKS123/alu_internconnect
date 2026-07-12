@@ -104,6 +104,8 @@ class ApplicationCubit extends Cubit<ApplicationState> {
     required String coverLetter,
     String? portfolioUrl,
     List<String> relevantSkills = const [],
+    bool isPaid = false,
+    String? compensation,
   }) async {
     emit(ApplicationSubmitting());
     try {
@@ -120,6 +122,8 @@ class ApplicationCubit extends Cubit<ApplicationState> {
         coverLetter: coverLetter,
         portfolioUrl: portfolioUrl,
         relevantSkills: relevantSkills,
+        isPaid: isPaid,
+        compensation: compensation,
       );
       emit(ApplicationSubmitted(app));
     } on Exception catch (e) {
@@ -132,6 +136,10 @@ class ApplicationCubit extends Cubit<ApplicationState> {
     required String status,
     String? note,
     DateTime? interviewDate,
+    String? rejectionReason,
+    String? applicantId,
+    String? startupName,
+    String? opportunityTitle,
   }) async {
     try {
       await _repository.updateApplicationStatus(
@@ -139,10 +147,48 @@ class ApplicationCubit extends Cubit<ApplicationState> {
         status: status,
         note: note,
         interviewDate: interviewDate,
+        rejectionReason: rejectionReason,
+        applicantId: applicantId,
+        startupName: startupName,
+        opportunityTitle: opportunityTitle,
       );
     } on Exception catch (e) {
       emit(ApplicationError(e.toString()));
     }
+  }
+
+  Future<void> editApplication({
+    required String applicationId,
+    required String coverLetter,
+    String? portfolioUrl,
+    List<String> relevantSkills = const [],
+  }) async {
+    await _repository.updateApplication(
+      applicationId: applicationId,
+      coverLetter: coverLetter,
+      portfolioUrl: portfolioUrl,
+      relevantSkills: relevantSkills,
+    );
+  }
+
+  Future<void> scheduleMeeting({
+    required String applicationId,
+    required String applicantId,
+    required DateTime meetingDate,
+    required String meetingTime,
+    required String meetingLocation,
+    required String startupName,
+    required String opportunityTitle,
+  }) async {
+    await _repository.scheduleMeeting(
+      applicationId: applicationId,
+      applicantId: applicantId,
+      meetingDate: meetingDate,
+      meetingTime: meetingTime,
+      meetingLocation: meetingLocation,
+      startupName: startupName,
+      opportunityTitle: opportunityTitle,
+    );
   }
 
   @override

@@ -6,6 +6,7 @@ import '../../auth/bloc/auth_cubit.dart';
 import '../../opportunities/bloc/opportunity_cubit.dart';
 import '../../opportunities/widgets/opportunity_card.dart';
 import '../../opportunities/widgets/recommended_card.dart';
+import '../../notifications/bloc/notification_cubit.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +17,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? _selectedCategory;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -26,7 +29,14 @@ class _HomeScreenState extends State<HomeScreen> {
             userId: authState.user.id,
             userSkills: authState.user.skills,
           );
+      context.read<NotificationCubit>().loadForUser(authState.user.id);
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -45,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             return CustomScrollView(
               slivers: [
-                // ── Header ──────────────────────────────────────────────────
+                // ── Header ───
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -69,91 +79,114 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                         ),
-                        Stack(
-                          children: [
-                            GestureDetector(
-                              onTap: () => context.go('/profile'),
-                              child: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: AppColors.primaryLight,
-                                backgroundImage: user.photoUrl != null
-                                    ? NetworkImage(user.photoUrl!)
-                                    : null,
-                                child: user.photoUrl == null
-                                    ? Text(
-                                        user.firstName[0].toUpperCase(),
-                                        style: AppTextStyles.titleLarge
-                                            .copyWith(color: AppColors.primary),
-                                      )
-                                    : null,
-                              ),
-                            ),
-                            Positioned(
-                              right: 0,
-                              top: 0,
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: AppColors.error,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppColors.background,
-                                    width: 1.5,
+                        BlocBuilder<NotificationCubit, NotificationState>(
+                          builder: (context, notifState) {
+                            final unread = notifState is NotificationsLoaded
+                                ? notifState.unreadCount
+                                : 0;
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                IconButton(
+                                  onPressed: () => context.push('/notifications'),
+                                  icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
+                                if (unread > 0)
+                                  Positioned(
+                                    right: 6,
+                                    top: 6,
+                                    child: Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.error,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: AppColors.background,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => context.go('/profile'),
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundColor: AppColors.primaryLight,
+                            backgroundImage: user.photoUrl != null
+                                ? NetworkImage(user.photoUrl!)
+                                : null,
+                            child: user.photoUrl == null
+                                ? Text(
+                                    user.firstName[0].toUpperCase(),
+                                    style: AppTextStyles.titleLarge
+                                        .copyWith(color: AppColors.primary),
+                                  )
+                                : null,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
 
-                // ── Search bar ───────────────────────────────────────────────
+                
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    child: GestureDetector(
-                      onTap: () => context.go('/explore'),
-                      child: Container(
-                        height: 50,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search, color: AppColors.textTertiary, size: 20),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Search opportunities...',
+                    child: Container(
+                      height: 50,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.search, color: AppColors.textTertiary, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (value) =>
+                                  setState(() => _searchQuery = value.trim()),
+                              decoration: InputDecoration(
+                                hintText: 'Search opportunities...',
+                                hintStyle: AppTextStyles.bodyMedium,
+                                border: InputBorder.none,
+                                isCollapsed: true,
+                              ),
                               style: AppTextStyles.bodyMedium,
                             ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryLight,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                          ),
+                          if (_searchQuery.isNotEmpty)
+                            GestureDetector(
+                              onTap: () => setState(() {
+                                _searchController.clear();
+                                _searchQuery = '';
+                              }),
                               child: const Icon(
-                                Icons.tune_rounded,
-                                color: AppColors.primary,
-                                size: 16,
+                                Icons.clear_rounded,
+                                color: AppColors.textTertiary,
+                                size: 18,
                               ),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
                 ),
 
-                // ── Startup: quick actions ───────────────────────────────────
+                // ── Startup: quick actions ───
                 if (user.isStartup)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -162,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                // ── Recommended ──────────────────────────────────────────────
+                // ── Recommended ───
                 if (!user.isStartup)
                   BlocBuilder<OpportunityCubit, OpportunityState>(
                     builder: (context, state) {
@@ -215,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
 
-                // ── Browse by category ───────────────────────────────────────
+                // ── Browse by category ───
                 if (!user.isStartup)
                   SliverToBoxAdapter(
                     child: Column(
@@ -273,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
 
-                // ── Recent opportunities ─────────────────────────────────────
+                // ── Recent opportunities ───
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
@@ -323,6 +356,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       return const SliverToBoxAdapter(child: SizedBox());
                     }
 
+                    final query = _searchQuery.toLowerCase();
+                    bool matchesQuery(opportunity) {
+                      if (query.isEmpty) return true;
+                      return opportunity.title.toLowerCase().contains(query) ||
+                          opportunity.category.toLowerCase().contains(query) ||
+                          opportunity.startupName.toLowerCase().contains(query) ||
+                          opportunity.skills.any(
+                              (s) => s.toLowerCase().contains(query));
+                    }
+
+                    final hasActiveFilter =
+                        _selectedCategory != null || query.isNotEmpty;
+
                     final opportunities = (user.isStartup
                             ? state.opportunities
                                 .where((o) => o.startupId == user.id)
@@ -330,7 +376,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? state.opportunities
                                     .where((o) => o.category == _selectedCategory)
                                 : state.opportunities)
-                        .take(_selectedCategory != null ? 20 : 5)
+                        .where(matchesQuery)
+                        .take(hasActiveFilter ? 20 : 5)
                         .toList();
                     if (opportunities.isEmpty) {
                       return SliverToBoxAdapter(
@@ -342,9 +389,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   size: 48, color: AppColors.textTertiary),
                               const SizedBox(height: 12),
                               Text(
-                                _selectedCategory != null
-                                    ? 'No $_selectedCategory opportunities yet'
-                                    : 'No opportunities yet',
+                                query.isNotEmpty
+                                    ? 'No opportunities match "$_searchQuery"'
+                                    : _selectedCategory != null
+                                        ? 'No $_selectedCategory opportunities yet'
+                                        : 'No opportunities yet',
                                 style: AppTextStyles.bodyMedium,
                               ),
                             ],

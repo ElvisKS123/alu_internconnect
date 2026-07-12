@@ -20,8 +20,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _locationController;
   late TextEditingController _linkedinController;
   late TextEditingController _portfolioController;
+  final _customSkillController = TextEditingController();
   List<String> _selectedSkills = [];
   bool _isSaving = false;
+
+  void _addCustomSkill() {
+    final skill = _customSkillController.text.trim();
+    if (skill.isEmpty) return;
+    // Avoid case-sensitive duplicates (e.g. "flutter" vs "Flutter").
+    final alreadyAdded = _selectedSkills
+        .any((s) => s.toLowerCase() == skill.toLowerCase());
+    if (alreadyAdded) {
+      _customSkillController.clear();
+      return;
+    }
+    setState(() {
+      _selectedSkills.add(skill);
+      _customSkillController.clear();
+    });
+  }
 
   @override
   void initState() {
@@ -44,6 +61,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _locationController.dispose();
     _linkedinController.dispose();
     _portfolioController.dispose();
+    _customSkillController.dispose();
     super.dispose();
   }
 
@@ -71,6 +89,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await context.read<AuthRepository>().updateUserProfile(updatedUser);
 
       if (!mounted) return;
+
+      // Keep AuthCubit's in-memory user in sync immediately (skills, bio,
+      // etc.), otherwise the app keeps showing the pre-edit profile until
+      // the next sign-in.
+      context.read<AuthCubit>().updateLocalUser(updatedUser);
 
       final messenger = ScaffoldMessenger.of(context);
       messenger.showSnackBar(
@@ -225,46 +248,98 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
 
               const SizedBox(height: 28),
-              const _Label('Skills'),
+              const _Label('Skills & Interests'),
               const SizedBox(height: 6),
-              Text('Select your skills so startups can find you.',
+              Text('Add any skill or interest, or pick from popular ones below.',
                   style: AppTextStyles.bodySmall),
               const SizedBox(height: 12),
+
+              // Free-text add field, for skills/interests not in the
+              // predefined list below.
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _customSkillController,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _addCustomSkill(),
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Public Speaking, Photography...',
+                        prefixIcon: Icon(Icons.add_rounded, size: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _addCustomSkill,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 54),
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                    ),
+                    child: const Text('Add',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+
+              if (_selectedSkills.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('Your skills (tap to remove)', style: AppTextStyles.labelLarge),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _selectedSkills.map((skill) {
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedSkills.remove(skill)),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(skill,
+                                style: AppTextStyles.labelLarge
+                                    .copyWith(color: Colors.white)),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.close_rounded,
+                                color: Colors.white, size: 15),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+              Text('Popular skills', style: AppTextStyles.labelLarge),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: AppConstants.popularSkills.map((skill) {
-                  final isSelected = _selectedSkills.contains(skill);
+                // Only offer skills that aren't already selected above --
+                // once picked, a skill moves into the removable list.
+                children: AppConstants.popularSkills
+                    .where((skill) => !_selectedSkills
+                        .any((s) => s.toLowerCase() == skill.toLowerCase()))
+                    .map((skill) {
                   return GestureDetector(
-                    onTap: () => setState(() {
-                      if (isSelected) {
-                        _selectedSkills.remove(skill);
-                      } else {
-                        _selectedSkills.add(skill);
-                      }
-                    }),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                    onTap: () => setState(() => _selectedSkills.add(skill)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary
-                            : AppColors.surface,
+                        color: AppColors.surface,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.border,
-                        ),
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: Text(
                         skill,
-                        style: AppTextStyles.labelLarge.copyWith(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        ),
+                        style: AppTextStyles.labelLarge
+                            .copyWith(color: AppColors.textSecondary),
                       ),
                     ),
                   );

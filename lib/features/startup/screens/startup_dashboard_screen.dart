@@ -20,6 +20,7 @@ class StartupDashboardScreen extends StatefulWidget {
 
 class _StartupDashboardScreenState extends State<StartupDashboardScreen> {
   StartupModel? _startup;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -38,7 +39,10 @@ class _StartupDashboardScreenState extends State<StartupDashboardScreen> {
 
     if (!mounted) return;
 
-    setState(() => _startup = startup);
+    setState(() {
+      _startup = startup;
+      _isLoading = false;
+    });
 
     if (startup != null) {
       applicationCubit.loadStartupApplications(startup.id);
@@ -47,6 +51,10 @@ class _StartupDashboardScreenState extends State<StartupDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = context.watch<AuthCubit>().state;
+    final username =
+        authState is AuthAuthenticated ? authState.user.firstName : 'there';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -56,21 +64,27 @@ class _StartupDashboardScreenState extends State<StartupDashboardScreen> {
         ),
         title: const Text('Dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            onPressed: () => context.push('/opportunity/create'),
-            tooltip: 'Post new opportunity',
-          ),
+          if (_startup != null)
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              onPressed: () => context.push('/opportunity/create'),
+              tooltip: 'Post new opportunity',
+            ),
         ],
       ),
-      body: _startup == null
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : _startup == null
+              ? _UnregisteredState(username: username)
+              : SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SizedBox(height: 20),
 
+                  // Header: welcome + verification badge
+                  _DashboardHeader(startup: _startup!),
 
                   const SizedBox(height: 20),
 
@@ -132,17 +146,7 @@ class _StartupDashboardScreenState extends State<StartupDashboardScreen> {
                         children: state.applications
                             .map((app) => Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
-                                  child: _ApplicantCard(
-                                    application: app,
-                                    onUpdateStatus: (status) async {
-                                      await context
-                                          .read<ApplicationCubit>()
-                                          .updateStatus(
-                                            applicationId: app.id,
-                                            status: status,
-                                          );
-                                    },
-                                  ),
+                                  child: _ApplicantCard(application: app),
                                 ))
                             .toList(),
                       );
@@ -201,6 +205,108 @@ class _StartupDashboardScreenState extends State<StartupDashboardScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _UnregisteredState extends StatelessWidget {
+  final String username;
+  const _UnregisteredState({required this.username});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.rocket_launch_outlined,
+                  color: AppColors.primary, size: 32),
+            ),
+            const SizedBox(height: 20),
+            Text('Hi, $username', style: AppTextStyles.headlineLarge),
+            const SizedBox(height: 10),
+            Text(
+              'Register your startup to start posting opportunities for ALU students.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton(
+              onPressed: () => context.push('/startup/register'),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(220, 50)),
+              child: const Text('Register Startup',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardHeader extends StatelessWidget {
+  final StartupModel startup;
+  const _DashboardHeader({required this.startup});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Welcome, ${startup.name} 👋',
+            style: AppTextStyles.headlineLarge),
+        const SizedBox(height: 8),
+        if (startup.isApproved)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.verified_rounded,
+                    color: AppColors.success, size: 14),
+                const SizedBox(width: 4),
+                Text('ALU Verified Startup',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.success, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.hourglass_top_rounded,
+                    color: AppColors.warning, size: 14),
+                const SizedBox(width: 4),
+                Text('Verification pending',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.warning, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -275,22 +381,15 @@ class _StatCard extends StatelessWidget {
 
 class _ApplicantCard extends StatelessWidget {
   final ApplicationModel application;
-  final ValueChanged<String> onUpdateStatus;
 
-  const _ApplicantCard({
-    required this.application,
-    required this.onUpdateStatus,
-  });
+  const _ApplicantCard({required this.application});
 
   void _openDetail(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ApplicantDetailSheet(
-        application: application,
-        onUpdateStatus: onUpdateStatus,
-      ),
+      builder: (_) => _ApplicantDetailSheet(application: application),
     );
   }
 
@@ -433,10 +532,7 @@ class _ApplicantCard extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: _ApplicantActionButtons(
-              status: application.status,
-              onUpdateStatus: onUpdateStatus,
-            ),
+            child: _ApplicantActionButtons(application: application),
           ),
         ],
       ),
@@ -445,22 +541,50 @@ class _ApplicantCard extends StatelessWidget {
 }
 
 class _ApplicantActionButtons extends StatelessWidget {
-  final String status;
-  final ValueChanged<String> onUpdateStatus;
+  final ApplicationModel application;
 
-  const _ApplicantActionButtons({
-    required this.status,
-    required this.onUpdateStatus,
-  });
+  const _ApplicantActionButtons({required this.application});
+
+  Future<void> _reject(BuildContext context) async {
+    final reason = await _showRejectionReasonDialog(context);
+    if (reason == null || reason.trim().isEmpty) return;
+    if (!context.mounted) return;
+    await context.read<ApplicationCubit>().updateStatus(
+          applicationId: application.id,
+          status: 'rejected',
+          rejectionReason: reason.trim(),
+          applicantId: application.applicantId,
+          startupName: application.startupName,
+          opportunityTitle: application.opportunityTitle,
+        );
+  }
+
+  Future<void> _updateStatus(BuildContext context, String status) {
+    return context.read<ApplicationCubit>().updateStatus(
+          applicationId: application.id,
+          status: status,
+        );
+  }
+
+  void _scheduleMeeting(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ScheduleMeetingSheet(application: application),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final status = application.status;
+
     if (status == 'pending' || status == 'under_review') {
       return Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () => onUpdateStatus('shortlisted'),
+              onPressed: () => _updateStatus(context, 'shortlisted'),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 38),
                 foregroundColor: AppColors.success,
@@ -472,7 +596,7 @@ class _ApplicantActionButtons extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: OutlinedButton(
-              onPressed: () => onUpdateStatus('under_review'),
+              onPressed: () => _updateStatus(context, 'under_review'),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 38),
                 foregroundColor: AppColors.primary,
@@ -484,7 +608,7 @@ class _ApplicantActionButtons extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: OutlinedButton(
-              onPressed: () => onUpdateStatus('rejected'),
+              onPressed: () => _reject(context),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 38),
                 foregroundColor: AppColors.error,
@@ -501,7 +625,7 @@ class _ApplicantActionButtons extends StatelessWidget {
         children: [
           Expanded(
             child: ElevatedButton(
-              onPressed: () => onUpdateStatus('accepted'),
+              onPressed: () => _updateStatus(context, 'accepted'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
                 minimumSize: const Size(0, 38),
@@ -512,7 +636,7 @@ class _ApplicantActionButtons extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: OutlinedButton(
-              onPressed: () => onUpdateStatus('rejected'),
+              onPressed: () => _reject(context),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(0, 38),
                 foregroundColor: AppColors.error,
@@ -524,18 +648,314 @@ class _ApplicantActionButtons extends StatelessWidget {
         ],
       );
     }
+    if (status == 'accepted') {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _scheduleMeeting(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            minimumSize: const Size(0, 38),
+          ),
+          icon: const Icon(Icons.event_available_rounded,
+              color: Colors.white, size: 18),
+          label: Text(
+            application.hasMeeting ? 'Update Meeting' : 'Schedule Meeting',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
     return const SizedBox();
+  }
+}
+
+// Shows a dialog asking for a required rejection reason. Returns the
+// entered reason, or null if the startup cancelled.
+Future<String?> _showRejectionReasonDialog(BuildContext context) {
+  final controller = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Reject application'),
+      content: Form(
+        key: formKey,
+        child: TextFormField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Let the student know why (required)...',
+            alignLabelWithHint: true,
+          ),
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'A rejection reason is required' : null,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+          onPressed: () {
+            if (formKey.currentState!.validate()) {
+              Navigator.pop(context, controller.text);
+            }
+          },
+          child: const Text('Reject', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ScheduleMeetingSheet extends StatefulWidget {
+  final ApplicationModel application;
+  const _ScheduleMeetingSheet({required this.application});
+
+  @override
+  State<_ScheduleMeetingSheet> createState() => _ScheduleMeetingSheetState();
+}
+
+class _ScheduleMeetingSheetState extends State<_ScheduleMeetingSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _locationController = TextEditingController();
+  DateTime? _date;
+  TimeOfDay? _time;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final app = widget.application;
+    _date = app.meetingDate;
+    _locationController.text = app.meetingLocation ?? '';
+    if (app.meetingTime != null) {
+      _time = _parseTime(app.meetingTime!);
+    }
+  }
+
+  TimeOfDay? _parseTime(String formatted) {
+    // Best-effort parse of a previously formatted "h:mm AM/PM" string.
+    try {
+      final isPm = formatted.toUpperCase().contains('PM');
+      final clean = formatted.toUpperCase().replaceAll(RegExp(r'[AP]M'), '').trim();
+      final parts = clean.split(':');
+      var hour = int.parse(parts[0].trim());
+      final minute = int.parse(parts[1].trim());
+      if (isPm && hour != 12) hour += 12;
+      if (!isPm && hour == 12) hour = 0;
+      return TimeOfDay(hour: hour, minute: minute);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatTime(TimeOfDay t) {
+    final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final minute = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date ?? DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time ?? const TimeOfDay(hour: 10, minute: 0),
+    );
+    if (picked != null) setState(() => _time = picked);
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_date == null || _time == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select both a date and a time')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await context.read<ApplicationCubit>().scheduleMeeting(
+            applicationId: widget.application.id,
+            applicantId: widget.application.applicantId,
+            meetingDate: _date!,
+            meetingTime: _formatTime(_time!),
+            meetingLocation: _locationController.text.trim(),
+            startupName: widget.application.startupName,
+            opportunityTitle: widget.application.opportunityTitle,
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Meeting scheduled'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Text('Schedule Meeting', style: AppTextStyles.headlineLarge),
+              const SizedBox(height: 4),
+              Text('with ${widget.application.applicantName}',
+                  style: AppTextStyles.bodyMedium),
+              const SizedBox(height: 20),
+
+              Text('Date', style: AppTextStyles.labelLarge),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickDate,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          color: AppColors.textSecondary, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        _date != null
+                            ? '${_date!.day}/${_date!.month}/${_date!.year}'
+                            : 'Select a date',
+                        style: _date != null
+                            ? AppTextStyles.bodyLarge
+                            : AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text('Time', style: AppTextStyles.labelLarge),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickTime,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time_rounded,
+                          color: AppColors.textSecondary, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        _time != null ? _formatTime(_time!) : 'Select a time',
+                        style: _time != null
+                            ? AppTextStyles.bodyLarge
+                            : AppTextStyles.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text('Location', style: AppTextStyles.labelLarge),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. ALU Campus, Room 204 or Google Meet link',
+                  prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                ),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Location is required' : null,
+              ),
+              const SizedBox(height: 24),
+
+              ElevatedButton(
+                onPressed: _isSaving ? null : _save,
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Save Meeting',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class _ApplicantDetailSheet extends StatelessWidget {
   final ApplicationModel application;
-  final ValueChanged<String> onUpdateStatus;
 
-  const _ApplicantDetailSheet({
-    required this.application,
-    required this.onUpdateStatus,
-  });
+  const _ApplicantDetailSheet({required this.application});
 
   @override
   Widget build(BuildContext context) {
@@ -683,14 +1103,49 @@ class _ApplicantDetailSheet extends StatelessWidget {
                       Text(application.startupNote!,
                           style: AppTextStyles.bodyMedium),
                     ],
+                    if (application.hasMeeting) ...[
+                      const SizedBox(height: 16),
+                      Text('Scheduled Meeting', style: AppTextStyles.labelLarge),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _DetailRow(
+                              icon: Icons.calendar_today_rounded,
+                              label: 'Date',
+                              value: application.meetingDate != null
+                                  ? '${application.meetingDate!.day}/${application.meetingDate!.month}/${application.meetingDate!.year}'
+                                  : '-',
+                            ),
+                            _DetailRow(
+                              icon: Icons.access_time_rounded,
+                              label: 'Time',
+                              value: application.meetingTime ?? '-',
+                            ),
+                            _DetailRow(
+                              icon: Icons.location_on_rounded,
+                              label: 'Location',
+                              value: application.meetingLocation ?? '-',
+                            ),
+                            _DetailRow(
+                              icon: Icons.flag_rounded,
+                              label: 'Status',
+                              value: application.meetingStatusDisplay,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
-                    _ApplicantActionButtons(
-                      status: application.status,
-                      onUpdateStatus: (status) {
-                        onUpdateStatus(status);
-                        Navigator.of(context).pop();
-                      },
-                    ),
+                    _ApplicantActionButtons(application: application),
                   ],
                 ),
               ),
@@ -835,22 +1290,44 @@ class _OpportunityManageCard extends StatelessWidget {
             ),
           ),
           if (opportunity.isOpen)
-            TextButton(
-              onPressed: onClose,
-              child: const Text('Close',
-                  style: TextStyle(color: AppColors.error, fontSize: 13)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () =>
+                      context.push('/opportunity/${opportunity.id}/edit'),
+                  child: const Text('Edit',
+                      style: TextStyle(color: AppColors.primary, fontSize: 13)),
+                ),
+                TextButton(
+                  onPressed: onClose,
+                  child: const Text('Close',
+                      style: TextStyle(color: AppColors.error, fontSize: 13)),
+                ),
+              ],
             )
           else
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.closed,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('Closed',
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.closedText)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () =>
+                      context.push('/opportunity/${opportunity.id}/edit'),
+                  child: const Text('Edit',
+                      style: TextStyle(color: AppColors.primary, fontSize: 13)),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.closed,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('Closed',
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.closedText)),
+                ),
+              ],
             ),
         ],
       ),

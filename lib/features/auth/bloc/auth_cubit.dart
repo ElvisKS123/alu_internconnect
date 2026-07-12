@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
 
-// ─── States ───────────────────────────────────────────────────────────────────
+// ─── States ────
 
 abstract class AuthState extends Equatable {
   const AuthState();
@@ -26,6 +26,9 @@ class AuthAuthenticated extends AuthState {
 
 class AuthUnauthenticated extends AuthState {}
 
+
+class AuthLoggedOut extends AuthState {}
+
 class AuthError extends AuthState {
   final String message;
   const AuthError(this.message);
@@ -35,7 +38,7 @@ class AuthError extends AuthState {
 
 class AuthPasswordResetSent extends AuthState {}
 
-// ─── Cubit ────────────────────────────────────────────────────────────────────
+// ─── Cubit ───
 
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepository _authRepository;
@@ -131,7 +134,17 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> signOut() async {
     await _authRepository.signOut();
-    emit(AuthUnauthenticated());
+    emit(AuthLoggedOut());
+  }
+
+  // Refreshes the in-memory authenticated user (e.g. after saving skills or
+  // other profile fields on the Edit Profile screen) so the rest of the app
+  // -- recommendations, the profile screen, etc. -- reflects the change
+  // immediately instead of only after a restart/re-login.
+  void updateLocalUser(UserModel user) {
+    if (state is AuthAuthenticated) {
+      emit(AuthAuthenticated(user));
+    }
   }
 
   Future<void> sendPasswordReset(String email) async {

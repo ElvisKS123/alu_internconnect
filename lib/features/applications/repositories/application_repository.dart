@@ -71,6 +71,40 @@ class ApplicationRepository {
     })();
   }
 
+  Future<ApplicationModel?> getApplicationById(String id) async {
+    try {
+      final doc = await _firestore
+          .collection(AppConstants.applicationsCollection)
+          .doc(id)
+          .get();
+      if (!doc.exists) return null;
+      return ApplicationModel.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('[ApplicationRepository] getApplicationById error: $e');
+      return null;
+    }
+  }
+
+  // Real-time single-application stream, used by the Application Details
+  // screen so students see status changes, rejection reasons, and
+  // scheduled meetings as soon as a startup updates them.
+  Stream<ApplicationModel?> watchApplicationById(String id) {
+    return (() async* {
+      try {
+        final stream = _firestore
+            .collection(AppConstants.applicationsCollection)
+            .doc(id)
+            .snapshots();
+        await for (final doc in stream) {
+          yield doc.exists ? ApplicationModel.fromFirestore(doc) : null;
+        }
+      } catch (e) {
+        debugPrint('[ApplicationRepository] watchApplicationById error: $e');
+        yield null;
+      }
+    })();
+  }
+
   Future<bool> hasApplied({
     required String studentId,
     required String opportunityId,
@@ -103,6 +137,8 @@ class ApplicationRepository {
     String? portfolioUrl,
     String? resumeUrl,
     List<String> relevantSkills = const [],
+    bool isPaid = false,
+    String? compensation,
   }) async {
     // Check for duplicate
     final alreadyApplied = await hasApplied(
@@ -129,6 +165,8 @@ class ApplicationRepository {
       resumeUrl: resumeUrl,
       relevantSkills: relevantSkills,
       status: 'pending',
+      isPaid: isPaid,
+      compensation: compensation,
       appliedAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -155,6 +193,11 @@ class ApplicationRepository {
     required String status,
     String? note,
     DateTime? interviewDate,
+    String? rejectionReason,
+    // Optional context used only to fire a rejection notification below.
+    String? applicantId,
+    String? startupName,
+    String? opportunityTitle,
   }) async {
     final updates = <String, dynamic>{
       'status': status,
@@ -164,11 +207,92 @@ class ApplicationRepository {
     if (interviewDate != null) {
       updates['interviewDate'] = Timestamp.fromDate(interviewDate);
     }
+    if (status == 'rejected' && rejectionReason != null) {
+      updates['rejectionReason'] = rejectionReason;
+    }
 
     await _firestore
         .collection(AppConstants.applicationsCollection)
         .doc(applicationId)
         .update(updates);
+
+    if (status == 'rejected' && applicantId != null) {
+      try {
+        final ref = _firestore.collection(AppConstants.notificationsCollection).doc();
+        await ref.set({
+          'userId': applicantId,
+          'type': 'application_rejected',
+          'title': 'Application update from ${startupName ?? 'a startup'}',
+          'body': opportunityTitle != null
+              ? 'Your application for "$opportunityTitle" was not successful this time.'
+              : 'Your application was not successful this time.',
+          'applicationId': applicationId,
+          'read': false,
+          'createdAt': Timestamp.now(),
+        });
+      } catch (e) {
+        debugPrint('[ApplicationRepository] rejection notification failed: $e');
+      }
+    }
+  }
+
+  // Let a student edit the editable fields of an application they already
+  // submitted (cover letter, portfolio link, relevant skills).
+  Future<void> updateApplication({
+    required String applicationId,
+    required String coverLetter,
+    String? portfolioUrl,
+    List<String> relevantSkills = const [],
+  }) async {
+    await _firestore
+        .collection(AppConstants.applicationsCollection)
+        .doc(applicationId)
+        .update({
+      'coverLetter': coverLetter,
+      'portfolioUrl': portfolioUrl,
+      'relevantSkills': relevantSkills,
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
+  // Startup schedules a meeting with an accepted applicant. This updates
+  // the application doc with the meeting details and drops a notification
+  // for the student in the notifications collection.
+  Future<void> scheduleMeeting({
+    required String applicationId,
+    required String applicantId,
+    required DateTime meetingDate,
+    required String meetingTime,
+    required String meetingLocation,
+    required String startupName,
+    required String opportunityTitle,
+  }) async {
+    await _firestore
+        .collection(AppConstants.applicationsCollection)
+        .doc(applicationId)
+        .update({
+      'meetingDate': Timestamp.fromDate(meetingDate),
+      'meetingTime': meetingTime,
+      'meetingLocation': meetingLocation,
+      'meetingStatus': 'scheduled',
+      'updatedAt': Timestamp.now(),
+    });
+
+    try {
+      final ref = _firestore.collection(AppConstants.notificationsCollection).doc();
+      await ref.set({
+        'userId': applicantId,
+        'type': 'meeting_scheduled',
+        'title': 'Meeting scheduled with $startupName',
+        'body':
+            '$startupName scheduled a meeting with you for "$opportunityTitle" on ${meetingDate.day}/${meetingDate.month}/${meetingDate.year} at $meetingTime.',
+        'applicationId': applicationId,
+        'read': false,
+        'createdAt': Timestamp.now(),
+      });
+    } catch (e) {
+      debugPrint('[ApplicationRepository] scheduleMeeting notification failed: $e');
+    }
   }
 
   Future<void> withdrawApplication(String applicationId, String opportunityId) async {

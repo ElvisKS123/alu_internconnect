@@ -138,6 +138,21 @@ class OpportunityRepository {
     }
   }
 
+  // Fetches the full opportunity docs for a set of bookmarked IDs. Used by
+  // the Saved Opportunities screen -- bookmarked opportunities may no
+  // longer be in the "open" stream (e.g. since closed), so we fetch them
+  // directly by ID rather than filtering the open-opportunities list.
+  Future<List<OpportunityModel>> getOpportunitiesByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    try {
+      final results = await Future.wait(ids.map(getOpportunityById));
+      return results.whereType<OpportunityModel>().toList();
+    } catch (e) {
+      debugPrint('[OpportunityRepository] getOpportunitiesByIds error: $e');
+      return <OpportunityModel>[];
+    }
+  }
+
   Future<OpportunityModel> createOpportunity(OpportunityModel opportunity) async {
     final ref = _firestore
         .collection(AppConstants.opportunitiesCollection)
@@ -184,6 +199,32 @@ class OpportunityRepository {
     }
 
     return newOpp;
+  }
+
+  // Lets a startup edit an opportunity it already posted. Only the
+  // editable content fields are touched; startupId/status/applicationCount/
+  // createdAt are left as-is.
+  Future<void> updateOpportunity(OpportunityModel opportunity) async {
+    await _firestore
+        .collection(AppConstants.opportunitiesCollection)
+        .doc(opportunity.id)
+        .update({
+      'title': opportunity.title,
+      'description': opportunity.description,
+      'category': opportunity.category,
+      'skills': opportunity.skills,
+      'tags': opportunity.tags,
+      'type': opportunity.type,
+      'location': opportunity.location,
+      'hoursPerWeek': opportunity.hoursPerWeek,
+      'duration': opportunity.duration,
+      'isPaid': opportunity.isPaid,
+      'compensation': opportunity.compensation,
+      'deadline': opportunity.deadline != null
+          ? Timestamp.fromDate(opportunity.deadline!)
+          : null,
+      'updatedAt': Timestamp.now(),
+    });
   }
 
   Future<void> closeOpportunity(String opportunityId, String startupId) async {

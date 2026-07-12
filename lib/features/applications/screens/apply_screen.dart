@@ -5,13 +5,20 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../auth/bloc/auth_cubit.dart';
 import '../../applications/bloc/application_cubit.dart';
+import '../../applications/repositories/application_repository.dart';
+import '../models/application_model.dart';
 import '../../opportunities/repositories/opportunity_repository.dart';
 import '../../opportunities/models/opportunity_model.dart';
 
 class ApplyScreen extends StatefulWidget {
   final String opportunityId;
+  // When set, the screen opens in "edit an existing application" mode
+  // instead of "submit a new application" mode.
+  final String? applicationId;
 
-  const ApplyScreen({super.key, required this.opportunityId});
+  const ApplyScreen({super.key, required this.opportunityId, this.applicationId});
+
+  bool get isEditMode => applicationId != null;
 
   @override
   State<ApplyScreen> createState() => _ApplyScreenState();
@@ -23,22 +30,73 @@ class _ApplyScreenState extends State<ApplyScreen> {
   final _portfolioController = TextEditingController();
   final List<String> _selectedSkills = [];
   OpportunityModel? _opportunity;
+  ApplicationModel? _existingApplication;
   bool _isLoading = true;
+  bool _isSavingEdit = false;
 
   @override
   void initState() {
     super.initState();
-    _loadOpportunity();
+    _load();
   }
 
-  Future<void> _loadOpportunity() async {
+  Future<void> _load() async {
     final opp = await context
         .read<OpportunityRepository>()
         .getOpportunityById(widget.opportunityId);
+
+    ApplicationModel? existing;
+    if (widget.isEditMode) {
+      existing = await context
+          .read<ApplicationRepository>()
+          .getApplicationById(widget.applicationId!);
+      if (existing != null) {
+        _coverLetterController.text = existing.coverLetter;
+        _portfolioController.text = existing.portfolioUrl ?? '';
+        _selectedSkills
+          ..clear()
+          ..addAll(existing.relevantSkills);
+      }
+    }
+
+    if (!mounted) return;
     setState(() {
       _opportunity = opp;
+      _existingApplication = existing;
       _isLoading = false;
     });
+  }
+
+  Future<void> _saveEdit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_existingApplication == null) return;
+
+    setState(() => _isSavingEdit = true);
+    try {
+      await context.read<ApplicationCubit>().editApplication(
+            applicationId: _existingApplication!.id,
+            coverLetter: _coverLetterController.text.trim(),
+            portfolioUrl: _portfolioController.text.trim().isNotEmpty
+                ? _portfolioController.text.trim()
+                : null,
+            relevantSkills: _selectedSkills,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Application updated'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingEdit = false);
+    }
   }
 
   @override
@@ -49,6 +107,10 @@ class _ApplyScreenState extends State<ApplyScreen> {
   }
 
   Future<void> _submit() async {
+    if (widget.isEditMode) {
+      await _saveEdit();
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     if (_opportunity == null) return;
 
@@ -71,6 +133,8 @@ class _ApplyScreenState extends State<ApplyScreen> {
               ? _portfolioController.text.trim()
               : null,
           relevantSkills: _selectedSkills,
+          isPaid: _opportunity!.isPaid,
+          compensation: _opportunity!.compensation,
         );
   }
 
@@ -106,7 +170,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
             icon: const Icon(Icons.arrow_back_ios_rounded),
             onPressed: () => context.pop(),
           ),
-          title: const Text('Apply'),
+          title: Text(widget.isEditMode ? 'Edit Application' : 'Apply'),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -225,25 +289,41 @@ class _ApplyScreenState extends State<ApplyScreen> {
 
                 const SizedBox(height: 36),
 
-                BlocBuilder<ApplicationCubit, ApplicationState>(
-                  builder: (context, state) {
-                    return ElevatedButton(
-                      onPressed:
-                          state is ApplicationSubmitting ? null : _submit,
-                      child: state is ApplicationSubmitting
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Submit Application',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600)),
-                    );
-                  },
+                widget.isEditMode
+                    ? ElevatedButton(
+                        onPressed: _isSavingEdit ? null : _submit,
+                        child: _isSavingEdit
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Save Changes',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600)),
+                      )
+                    : BlocBuilder<ApplicationCubit, ApplicationState>(
+                        builder: (context, state) {
+                          return ElevatedButton(
+                            onPressed:
+                                state is ApplicationSubmitting ? null : _submit,
+                            child: state is ApplicationSubmitting
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Submit Application',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600)),
+                          );
+                        },
                 ),
                 const SizedBox(height: 40),
               ],
