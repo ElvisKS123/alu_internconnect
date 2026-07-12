@@ -177,7 +177,7 @@ class ProfileScreen extends StatelessWidget {
                                 title: Text('Log out?',
                                     style: AppTextStyles.headlineMedium),
                                 content: Text(
-                                    'You will be redirected to the login screen.',
+                                    'Are you sure you want to log out?',
                                     style: AppTextStyles.bodyMedium),
                                 actions: [
                                   TextButton(

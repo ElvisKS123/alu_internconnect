@@ -76,7 +76,6 @@ lib/
 | `opportunities` | Internship/role listings |
 | `applications` | Student applications with status |
 | `bookmarks` | Student saved opportunities |
-| `notifications` | In-app notifications |
 
 ---
 
@@ -108,7 +107,6 @@ flutter pub get
 **c) Install FlutterFire CLI and configure**
 ```bash
 dart pub global activate flutterfire_cli
-flutterfire configure --project=YOUR_FIREBASE_PROJECT_ID
 ```
 This auto-generates `lib/firebase_options.dart` with your credentials.
 
@@ -123,7 +121,7 @@ firebase deploy --only firestore:rules
 flutter run
 
 # On iOS simulator
-flutter run -d ios
+flutter run -d android
 
 # With specific device
 flutter devices
@@ -147,7 +145,7 @@ All Cubits are provided at the app root via `MultiBlocProvider` and repositories
 ## Firestore Security Rules
 
 Security rules are in `firestore.rules`. Key rules:
-- Students can only read/write their own applications
+- Students can view/apply for applications
 - Startups can post opportunities
 - Startup owners can update application status
 - Admin role can approve/reject startups
@@ -156,7 +154,7 @@ Security rules are in `firestore.rules`. Key rules:
 
 ## Demo Credentials (for testing)
 
-After setup, create test accounts manually or seed the database. Suggested test data:
+After setup, create test accounts manually. Suggested test data:
 
 | Role | Email | Password |
 |---|---|---|
